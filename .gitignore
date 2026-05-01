@@ -1,0 +1,7 @@
+# Luna AI
+node_modules/
+dist/
+release/
+.env
+database/luna.db
+*.log

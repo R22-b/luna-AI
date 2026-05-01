@@ -1,0 +1,5 @@
+{
+  "dashboard": ["weather", "goals", "news", "spotify"],
+  "sidebar": "expanded",
+  "chatBubbleStyle": "glass-minimal"
+}

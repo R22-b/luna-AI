@@ -1,0 +1,73 @@
+{
+  "name": "luna-ai",
+  "version": "2.0.0",
+  "description": "Luna AI — AGI-level desktop companion built by Ravikiran",
+  "main": "main.js",
+  "author": "Ravikiran",
+  "license": "MIT",
+  "scripts": {
+    "dev": "concurrently -k \"vite --port 5173\" \"node scripts/wait-and-launch.js\"",
+    "build": "vite build",
+    "dist:win": "npm run build && electron-builder --win",
+    "start": "electron ."
+  },
+  "dependencies": {
+    "axios": "^1.7.9",
+    "better-sqlite3": "^11.7.0",
+    "chokidar": "^3.6.0",
+    "docx": "^8.5.0",
+    "dotenv": "^16.4.7",
+    "edge-tts": "^1.0.1",
+    "electron-store": "^8.2.0",
+    "electron-updater": "^6.3.9",
+    "exceljs": "^4.4.0",
+    "node-fetch": "^2.7.0",
+    "node-schedule": "^2.1.1",
+    "pdf-lib": "^1.17.1",
+    "pdf-parse": "^1.1.1",
+    "pptxgenjs": "^3.12.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^6.28.0",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.4",
+    "autoprefixer": "^10.4.20",
+    "concurrently": "^8.2.2",
+    "electron": "^30.5.1",
+    "electron-builder": "^24.13.3",
+    "postcss": "^8.4.49",
+    "tailwindcss": "^3.4.17",
+    "vite": "^5.4.11"
+  },
+  "build": {
+    "appId": "com.ravikiran.luna",
+    "productName": "Luna AI",
+    "win": {
+      "target": "nsis",
+      "icon": "assets/luna-icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Luna AI"
+    },
+    "files": [
+      "dist/**/*",
+      "backend/**/*",
+      "database/**/*",
+      "plugins/**/*",
+      "theme/**/*",
+      "assets/**/*",
+      "main.js",
+      "preload.js",
+      "package.json"
+    ],
+    "directories": {
+      "output": "release"
+    }
+  }
+}

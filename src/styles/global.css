@@ -1,0 +1,129 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ============================================
+   🌙 LUNA AI — Global Styles
+   ============================================ */
+
+:root {
+  --luna-primary: #7c3aed;
+  --luna-bg: #000000;
+  --luna-surface: #07070f;
+  --luna-border: #1a1a2e;
+  --luna-accent: #1e8fa0;
+  --luna-text-primary: #c4c4d4;
+  --luna-text-muted: #4a4a6a;
+  --luna-radius: 12px;
+  --luna-font-size: 13px;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--luna-bg);
+  color: var(--luna-text-primary);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-size: var(--luna-font-size);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ── Scrollbar ──────────────────────────────── */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--luna-border);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--luna-text-muted);
+}
+
+/* ── Selection ──────────────────────────────── */
+::selection {
+  background: rgba(124, 58, 237, 0.3);
+  color: #ffffff;
+}
+
+/* ── Glassmorphism Utility ──────────────────── */
+.glass {
+  background: rgba(7, 7, 15, 0.7);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--luna-border);
+  border-radius: var(--luna-radius);
+}
+
+.glass-subtle {
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(26, 26, 46, 0.6);
+  border-radius: var(--luna-radius);
+}
+
+/* ── Glow Effects ───────────────────────────── */
+.glow-purple {
+  box-shadow: 0 0 20px rgba(124, 58, 237, 0.2);
+}
+
+.glow-teal {
+  box-shadow: 0 0 20px rgba(30, 143, 160, 0.2);
+}
+
+/* ── Drag Region (Custom Titlebar) ──────────── */
+.drag-region {
+  -webkit-app-region: drag;
+}
+
+.no-drag {
+  -webkit-app-region: no-drag;
+}
+
+/* ── Transitions ────────────────────────────── */
+.transition-luna {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ── Animations ─────────────────────────────── */
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slide-up {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes glow-pulse {
+  0%, 100% { box-shadow: 0 0 15px rgba(124, 58, 237, 0.2); }
+  50% { box-shadow: 0 0 30px rgba(124, 58, 237, 0.4); }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.3s ease-out;
+}
+
+.animate-slide-up {
+  animation: slide-up 0.4s ease-out both;
+}
+
+.animate-glow {
+  animation: glow-pulse 2s ease-in-out infinite;
+}
