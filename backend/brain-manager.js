@@ -17,7 +17,7 @@ const PROVIDERS = {
   },
   gemini: {
     name: 'Gemini',
-    model: 'gemini-2.0-flash',
+    model: process.env.GEMINI_MODEL || 'gemini-1.5-flash',
     keyEnv: 'GEMINI_API_KEY',
     format: 'gemini',
   },
@@ -30,7 +30,7 @@ const PROVIDERS = {
   },
   cohere: {
     name: 'Cohere',
-    model: 'command-r',
+    model: 'command-r-plus',
     url: 'https://api.cohere.ai/v1/chat',
     keyEnv: 'COHERE_API_KEY',
     format: 'cohere',
@@ -51,8 +51,8 @@ const PROVIDERS = {
   },
   huggingface: {
     name: 'HuggingFace',
-    model: 'mistralai/Mistral-7B-Instruct-v0.2',
-    url: 'https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.2',
+    model: 'mistralai/Mistral-7B-Instruct-v0.3',
+    url: 'https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.3',
     keyEnv: 'HF_API_KEY',
     format: 'huggingface',
   },

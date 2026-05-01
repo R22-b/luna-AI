@@ -725,7 +725,9 @@ CRITICAL:
 3. Write FULL, production-ready code with STUNNING CSS/UI.`,
       }], 'You are a master software engineer. Return ONLY the file content. No markdown.', 'code');
 
-      const filePath = path.join(projectDir, filename);
+      // Normalize path to prevent ENOENT on Windows if AI provides leading slashes
+      const cleanFilename = filename.replace(/^[/\\]+/, '');
+      const filePath = path.join(projectDir, cleanFilename);
       const fileDir = path.dirname(filePath);
       if (!fs.existsSync(fileDir)) fs.mkdirSync(fileDir, { recursive: true });
       
@@ -792,8 +794,15 @@ CRITICAL:
         if (message.toLowerCase().includes('run') || message.toLowerCase().includes('start')) {
           const hasPackageJson = createdFiles.some(f => f.includes('package.json'));
           const hasHtml = createdFiles.some(f => f.endsWith('.html'));
+          const isFullStack = message.toLowerCase().includes('fullstack') || message.toLowerCase().includes('full-stack') || message.toLowerCase().includes('backend') || message.toLowerCase().includes('database');
 
-          if (hasPackageJson) {
+          // If it's a static web project (HTML + JS), prioritize opening index.html directly
+          if (hasHtml && !isFullStack) {
+            const htmlFile = createdFiles.find(f => f.endsWith('index.html')) || createdFiles.find(f => f.endsWith('.html'));
+            exec(`start chrome "${path.join(projectDir, htmlFile)}"`);
+            runMessage = `\n\n(i opened it in Chrome for you! 🌐)`;
+          } else if (hasPackageJson) {
+            // Full-stack project logic...
             const portMatch = fullContentForPortCheck.match(/(?:listen\s*\(\s*|PORT\s*=?\s*|port\s*[:=]\s*|http:\/\/localhost:)(\d{4})\b/i);
             const port = portMatch ? portMatch[1] : 3000;
 
