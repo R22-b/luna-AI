@@ -2,15 +2,34 @@ import React, { useState, useEffect } from 'react';
 
 export default function EvolutionPage() {
   const [history, setHistory] = useState([]);
+  const [patterns, setPatterns] = useState([]);
   const [analysis, setAnalysis] = useState(null);
   const [loading, setLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState(null);
 
-  useEffect(() => { loadHistory(); }, []);
+  useEffect(() => { 
+    loadHistory(); 
+    loadPatterns();
+  }, []);
 
   async function loadHistory() {
     const res = await window.evolution?.getHistory();
     if (res?.success) setHistory(res.history || []);
+  }
+
+  async function loadPatterns() {
+    const res = await window.evolution?.getPatterns();
+    if (res?.success) setPatterns(res.patterns || []);
+  }
+
+  async function deletePattern(id) {
+    if (!confirm('Delete this behavioral pattern?')) return;
+    try {
+      await window.evolution?.deletePattern(id);
+      await loadPatterns();
+    } catch (err) {
+      alert(`Failed to delete: ${err.message}`);
+    }
   }
 
   async function runCycle() {
@@ -110,6 +129,29 @@ export default function EvolutionPage() {
           {analysis.analysis?.strengths.map((s, i) => <p key={i} className="text-xs text-green-400 mt-1">✅ {s}</p>)}
         </div>
       )}
+
+      {/* --- PATTERNS SECTION --- */}
+      <h2 className="text-sm font-medium text-luna-text-primary mb-3">Detected Behavioral Patterns</h2>
+      <div className="space-y-2 mb-8">
+        {patterns.map(p => (
+          <div key={p.id} className="bg-luna-surface border border-luna-border rounded-luna p-3 flex items-start justify-between gap-3">
+            <div>
+              <p className="text-sm text-luna-text-primary">{p.pattern}</p>
+              <div className="flex gap-3 mt-1 text-[10px] text-luna-text-muted">
+                <span>Importance: {p.importance}/10</span>
+                <span>Detected: {new Date(p.created_at).toLocaleDateString()}</span>
+              </div>
+            </div>
+            <button 
+              onClick={() => deletePattern(p.id)}
+              className="px-2 py-1 text-[10px] text-red-400 border border-red-500/20 rounded hover:bg-red-500/10 transition-all shrink-0"
+            >
+              DELETE
+            </button>
+          </div>
+        ))}
+        {patterns.length === 0 && <p className="text-sm text-luna-text-muted text-center py-4 italic">No patterns detected yet. Luna will analyze your behavior daily.</p>}
+      </div>
 
       <h2 className="text-sm font-medium text-luna-text-primary mb-3">Evolution Log</h2>
       <div className="space-y-2">

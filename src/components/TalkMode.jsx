@@ -40,7 +40,15 @@ export default function TalkMode({ isActive, onClose, lastLunaMessage, onUserSpo
   function stopListening() {
     recognitionRef.current?.stop();
     setIsListening(false);
+    window.dispatchEvent(new CustomEvent('sttFinished'));
   }
+
+  // Also dispatch when unmounted or isActive becomes false
+  useEffect(() => {
+    if (!isActive) {
+      window.dispatchEvent(new CustomEvent('sttFinished'));
+    }
+  }, [isActive]);
 
   if (!isActive) return null;
 

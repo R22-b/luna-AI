@@ -30,6 +30,21 @@ export default function ChatPage() {
     }
   }, [messages, activities]);
 
+  // Listen for Live Activity Feed from backend
+  useEffect(() => {
+    const handler = (data) => {
+      setActivities(prev => {
+        const newActivity = { icon: data?.icon || '⚙️', message: data?.step || 'Processing...', timestamp: data?.timestamp || Date.now() };
+        return [...prev, newActivity].slice(-50);
+      });
+    };
+    
+    if (window.luna?.on) {
+      const removeListener = window.luna.on('luna:activity', handler);
+      return removeListener;
+    }
+  }, []);
+
   async function loadProfile() {
     try {
       const res = await window.luna.getProfile();
@@ -100,6 +115,7 @@ export default function ChatPage() {
     }]);
 
     // Show activity
+    setActivities([]);
     setActivities([{ icon: '🧠', message: 'thinking...' }]);
 
     try {
@@ -119,7 +135,7 @@ export default function ChatPage() {
           timestamp: new Date().toISOString(),
           providerUsed: result.providerUsed,
           emotion: result.emotion,
-          badges: ['ARCHITECT'],
+          badges: result.badges || [],
         }]);
         // Auto-speak in talk mode
         if (talkMode) { try { window.voice?.speak({ text: result.response }); } catch {} }
@@ -306,6 +322,7 @@ export default function ChatPage() {
         <div className="px-6 py-6 border-t border-luna-border/20 bg-[#050a12]/50">
           <div className="max-w-4xl mx-auto flex items-end gap-3">
             <button 
+              data-talkmode="true"
               onClick={() => setTalkMode(true)} 
               className="w-12 h-12 rounded-2xl bg-luna-surface border border-luna-border/50 flex items-center justify-center shrink-0 hover:border-luna-primary/50 transition-all active:scale-95 group shadow-lg"
             >

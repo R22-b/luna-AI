@@ -159,10 +159,10 @@ export default function PluginsPage() {
 
       <div className="grid grid-cols-2 gap-4 mb-6">
         {[
-          { name: 'Spotify Controller', desc: 'Play/pause/skip from Luna', icon: '🎵', status: 'coming soon' },
-          { name: 'Email Assistant', desc: 'Draft and send emails via Luna', icon: '📧', status: 'coming soon' },
-          { name: 'Code Reviewer', desc: 'AI code review for your projects', icon: '🔍', status: 'coming soon' },
-          { name: 'Habit Tracker', desc: 'Build and track daily habits', icon: '✅', status: 'coming soon' },
+          { name: 'weather-widget', desc: 'Live weather updates on dashboard', icon: '🌤️', status: 'install' },
+          { name: 'auto-logger', desc: 'Background conversation logger', icon: '📝', status: 'install' },
+          { name: 'spotify-controller', desc: 'Play/pause/skip from Luna', icon: '🎵', status: 'coming soon' },
+          { name: 'email-assistant', desc: 'Draft and send emails via Luna', icon: '📧', status: 'coming soon' },
         ].map((plugin, i) => (
           <div key={i} className="bg-luna-surface border border-luna-border rounded-luna p-4 hover:border-luna-primary/30 transition-colors">
             <div className="flex items-center gap-2 mb-2">
@@ -170,7 +170,11 @@ export default function PluginsPage() {
               <h3 className="text-sm font-medium text-luna-text-primary">{plugin.name}</h3>
             </div>
             <p className="text-xs text-luna-text-muted mb-3">{plugin.desc}</p>
-            <span className="text-[10px] bg-luna-bg text-luna-text-muted px-2 py-0.5 rounded-full">{plugin.status}</span>
+            {plugin.status === 'install' ? (
+              <button className="text-[10px] bg-luna-primary text-white px-3 py-1 rounded hover:bg-luna-primary/80">Install</button>
+            ) : (
+              <span className="text-[10px] bg-luna-bg text-luna-text-muted px-2 py-0.5 rounded-full">{plugin.status}</span>
+            )}
           </div>
         ))}
       </div>

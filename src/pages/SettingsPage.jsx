@@ -3,6 +3,8 @@ import React, { useState, useEffect } from 'react';
 const PROVIDERS = [
   { key: 'GROQ_API_KEY', name: 'Groq', desc: 'Fastest inference', link: 'https://console.groq.com/keys', free: true },
   { key: 'GEMINI_API_KEY', name: 'Gemini', desc: 'Best reasoning', link: 'https://aistudio.google.com/apikey', free: true },
+  { key: 'DEEPSEEK_API_KEY', name: 'DeepSeek', desc: 'Elite coding brain', link: 'https://platform.deepseek.com/api_keys', free: true },
+  { key: 'CEREBRAS_API_KEY', name: 'Cerebras', desc: '1M tokens/day speed', link: 'https://cloud.cerebras.ai/', free: true },
   { key: 'OPENROUTER_API_KEY', name: 'OpenRouter', desc: 'Multi-model access', link: 'https://openrouter.ai/keys', free: true },
   { key: 'COHERE_API_KEY', name: 'Cohere', desc: 'Best summarization', link: 'https://dashboard.cohere.com/api-keys', free: true },
   { key: 'MISTRAL_API_KEY', name: 'Mistral', desc: 'Best for code', link: 'https://console.mistral.ai/api-keys', free: true },
@@ -12,6 +14,9 @@ const PROVIDERS = [
   { key: 'BRAVE_SEARCH_KEY', name: 'Brave Search', desc: 'Backup search', link: 'https://brave.com/search/api/', free: true },
   { key: 'OPENWEATHER_KEY', name: 'OpenWeather', desc: 'Weather data', link: 'https://openweathermap.org/appid', free: true },
   { key: 'NEWS_API_KEY', name: 'NewsAPI', desc: 'News headlines', link: 'https://newsapi.org/register', free: true },
+  { key: 'LEONARDO_API_KEY', name: 'Leonardo.ai', desc: 'Premium image gen', link: 'https://app.leonardo.ai/api', free: true },
+  { key: 'KLING_API_KEY', name: 'Kling AI', desc: 'Premium video gen', link: 'https://klingai.com/', free: true },
+  { key: 'PORCUPINE_ACCESS_KEY', name: 'Picovoice', desc: 'Wake word detection', link: 'https://console.picovoice.ai/', free: true },
 ];
 
 export default function SettingsPage() {
@@ -22,8 +27,32 @@ export default function SettingsPage() {
   const [keyInput, setKeyInput] = useState('');
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(null);
+  const [startup, setStartup] = useState(false);
+  const [wakeWordEnabled, setWakeWordEnabled] = useState(false);
 
-  useEffect(() => { loadProfile(); loadApiKeys(); }, []);
+  useEffect(() => { loadProfile(); loadApiKeys(); loadStartup(); loadWakeWord(); }, []);
+
+  async function loadWakeWord() {
+    const res = await window.settings?.getKey({ key: 'wakeWordEnabled' });
+    if (res?.success) setWakeWordEnabled(res.value === true || res.value === 'true');
+  }
+
+  async function toggleWakeWord() {
+    const newState = !wakeWordEnabled;
+    await window.settings?.saveKey({ key: 'wakeWordEnabled', value: newState });
+    setWakeWordEnabled(newState);
+  }
+
+  async function loadStartup() {
+    const res = await window.system?.getStartupState();
+    if (res?.success) setStartup(res.startup);
+  }
+
+  async function toggleStartup() {
+    const newState = !startup;
+    await window.system?.toggleStartup({ enable: newState });
+    setStartup(newState);
+  }
 
   async function loadProfile() {
     const res = await window.luna?.getProfile();
@@ -75,6 +104,29 @@ export default function SettingsPage() {
               <button onClick={saveNickname} className="px-4 py-2 bg-luna-primary text-white text-xs rounded-luna-sm hover:bg-luna-primary/80">Save</button>
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* System Settings */}
+      <div className="bg-luna-surface border border-luna-border rounded-luna p-4 mb-4 flex flex-col gap-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-sm font-medium text-luna-text-primary">🚀 Start with Windows</h2>
+            <p className="text-[11px] text-luna-text-muted mt-1">Run Luna silently in the background when your PC starts</p>
+          </div>
+          <button onClick={toggleStartup} className={`relative w-10 h-5 rounded-full transition-colors ${startup ? 'bg-luna-primary' : 'bg-gray-600'}`}>
+            <div className={`absolute top-0.5 left-0.5 bg-white w-4 h-4 rounded-full transition-transform ${startup ? 'translate-x-5' : 'translate-x-0'}`} />
+          </button>
+        </div>
+        
+        <div className="flex items-center justify-between pt-4 border-t border-luna-border/30">
+          <div>
+            <h2 className="text-sm font-medium text-luna-text-primary">🎤 Wake Word ("Computer")</h2>
+            <p className="text-[11px] text-luna-text-muted mt-1">Listen for the wake word to activate voice mode automatically (requires Picovoice key)</p>
+          </div>
+          <button onClick={toggleWakeWord} className={`relative w-10 h-5 rounded-full transition-colors ${wakeWordEnabled ? 'bg-luna-primary' : 'bg-gray-600'}`}>
+            <div className={`absolute top-0.5 left-0.5 bg-white w-4 h-4 rounded-full transition-transform ${wakeWordEnabled ? 'translate-x-5' : 'translate-x-0'}`} />
+          </button>
         </div>
       </div>
 

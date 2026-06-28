@@ -10,6 +10,8 @@ const lunaCore = require('./luna-core');
 const brain = require('./brain-manager');
 const searchEngine = require('./search-engine');
 const folderManager = require('./folder-manager');
+const Store = require('electron-store');
+const store = new Store();
 
 // Lazy-loaded modules (initialized when needed)
 let pcControl = null;
@@ -20,42 +22,69 @@ let themeManager = null;
 let studentTools = null;
 let pluginManager = null;
 
+// ── Web Server Bridge (For Phone/Chrome Access) ──
+const express = require('express');
+const cors = require('cors');
+const webApp = express();
+webApp.use(cors());
+webApp.use(express.json({ limit: '50mb' }));
+
+const WEB_PORT = 3000;
+try {
+  const server = webApp.listen(WEB_PORT, '127.0.0.1', () => {
+    console.log(`\n🌐 Remote Web Bridge active on port ${WEB_PORT} (Secured to localhost)`);
+    console.log(`📱 Web Bridge fallback disabled for security.`);
+  });
+  
+  server.on('error', (err) => {
+    if (err.code === 'EADDRINUSE') {
+      console.log(`⚠️ Port ${WEB_PORT} is already in use. Web Bridge fallback disabled.`);
+    } else {
+      console.error('🌐 Web Bridge Server Error:', err.message);
+    }
+  });
+} catch (err) {
+  console.log('🌐 Web Bridge Server failed to start:', err.message);
+}
+
 // ── Rate Limiter ──────────────────────────────
 const rateLimits = {};
-const RATE_LIMIT = 10; // max requests
+const RATE_LIMIT = 50; // max requests
 const RATE_WINDOW = 5000; // per 5 seconds
 
 function checkRateLimit(channel) {
   const now = Date.now();
-  if (!rateLimits[channel]) {
-    rateLimits[channel] = [];
-  }
-
-  // Remove old entries
+  if (!rateLimits[channel]) rateLimits[channel] = [];
   rateLimits[channel] = rateLimits[channel].filter(t => now - t < RATE_WINDOW);
-
-  if (rateLimits[channel].length >= RATE_LIMIT) {
-    return false; // Rate limited
-  }
-
+  if (rateLimits[channel].length >= RATE_LIMIT) return false;
   rateLimits[channel].push(now);
   return true;
 }
 
-// ── Safe Handler Wrapper ──────────────────────
+// ── Safe Handler Wrapper (Dual IPC + HTTP) ─────
 function safeHandle(channel, handler) {
+  // 1. Register Electron IPC
   ipcMain.handle(channel, async (event, ...args) => {
     try {
-      // Rate limit check
-      if (!checkRateLimit(channel)) {
-        return { success: false, error: 'whoa slow down baddy 😅 too many requests' };
-      }
-
-      const result = await handler(event, ...args);
-      return result;
+      if (!checkRateLimit(channel)) return { success: false, error: 'whoa slow down baddy 😅 too many requests' };
+      return await handler(event, ...args);
     } catch (err) {
       console.error(`[IPC Error] ${channel}:`, err.message);
       return { success: false, error: `oops something broke 😅 ${err.message}` };
+    }
+  });
+
+  // 2. Register Web REST API
+  const route = '/api/' + channel.replace(':', '/');
+  webApp.post(route, async (req, res) => {
+    try {
+      if (!checkRateLimit(channel)) return res.json({ success: false, error: 'whoa slow down baddy 😅 too many requests' });
+      // Pass null for event, req.body for data
+      const result = await handler(null, req.body);
+      res.json(result || { success: true });
+    } catch (err) {
+      console.error(`[Web Error] ${channel}:`, err.message);
+      res.json({ success: false, error: `oops something broke 😅 ${err.message}` });
     }
   });
 }
@@ -183,6 +212,17 @@ function registerAllHandlers() {
   safeHandle('luna:getStats', async () => {
     const stats = brain.getProviderStats();
     return { success: true, stats };
+  });
+
+  safeHandle('luna:getAutonomousUpdates', async () => {
+    try {
+      const autonomous = require('./autonomous-engine');
+      const updates = autonomous.getPendingInsights();
+      autonomous.clearInsights();
+      return { success: true, updates };
+    } catch {
+      return { success: false, updates: [] };
+    }
   });
 
   // ── PC CONTROL ──────────────────────────────
@@ -433,12 +473,22 @@ function registerAllHandlers() {
     }
   });
 
-  // ── SYSTEM ──────────────────────────────────
   safeHandle('luna:getSystemInfo', async () => {
     if (!pcControl) {
       try { pcControl = require('./pc-control'); } catch { return { success: false, error: 'PC control not loaded' }; }
     }
     return await pcControl.getSystemInfo();
+  });
+
+  safeHandle('luna:getStartupState', async () => {
+    const { app } = require('electron');
+    return { success: true, startup: app.getLoginItemSettings().openAtLogin };
+  });
+
+  safeHandle('luna:toggleStartup', async (_event, data) => {
+    const { app } = require('electron');
+    app.setLoginItemSettings({ openAtLogin: !!data?.enable });
+    return { success: true };
   });
 
   safeHandle('luna:getFolderPaths', async () => {
@@ -455,6 +505,32 @@ function registerAllHandlers() {
     memory.saveUserProfile('setup_completed', 'true');
     memory.saveUserProfile('setup_date', new Date().toISOString());
     return { success: true };
+  });
+
+  safeHandle('luna:getWeather', async () => {
+    const key = process.env.OPENWEATHER_KEY;
+    if (!key) return { success: false, error: 'No key' };
+    try {
+      const axios = require('axios');
+      const url = `https://api.openweathermap.org/data/2.5/weather?q=Bengaluru&appid=${key}&units=metric`;
+      const res = await axios.get(url, { timeout: 5000 });
+      return { success: true, temp: res.data.main.temp, condition: res.data.weather[0].description };
+    } catch {
+      return { success: false, error: 'Failed to fetch' };
+    }
+  });
+
+  safeHandle('luna:getNews', async () => {
+    const key = process.env.NEWS_API_KEY;
+    if (!key) return { success: false, error: 'No key' };
+    try {
+      const axios = require('axios');
+      const url = `https://newsapi.org/v2/top-headlines?country=in&apiKey=${key}`;
+      const res = await axios.get(url, { timeout: 5000 });
+      return { success: true, articles: res.data.articles.slice(0, 3) };
+    } catch {
+      return { success: false, error: 'Failed to fetch' };
+    }
   });
 
   // ── DIALOGS ─────────────────────────────────
@@ -536,6 +612,24 @@ function registerAllHandlers() {
     return { success: true };
   });
 
+  // ── SETTINGS (electron-store) ───────────────
+  safeHandle('settings:save-key', async (_event, data) => {
+    const { key, value } = data || {};
+    if (!key) return { success: false, error: 'key required' };
+    store.set(key, value);
+    return { success: true };
+  });
+
+  safeHandle('settings:get-key', async (_event, data) => {
+    const { key } = data || {};
+    if (!key) return { success: false, error: 'key required' };
+    return { success: true, value: store.get(key) || null };
+  });
+
+  safeHandle('settings:get-all-keys', async () => {
+    return { success: true, keys: store.store };
+  });
+
   // ── OPEN FOLDER IN EXPLORER ────────────────
   safeHandle('luna:openFolder', async (_event, data) => {
     const { shell } = require('electron');
@@ -543,6 +637,26 @@ function registerAllHandlers() {
     if (!folderPath) return { success: false, error: 'path required' };
     shell.openPath(folderPath);
     return { success: true };
+  });
+
+  // ── PATTERN DETECTION ───────────────────────
+  safeHandle('pattern:getAll', async () => {
+    try {
+      const patternEngine = require('./pattern-engine');
+      return { success: true, patterns: patternEngine.getStoredPatterns() };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  });
+
+  safeHandle('pattern:delete', async (_event, id) => {
+    if (!id) return { success: false, error: 'Pattern ID required' };
+    try {
+      const patternEngine = require('./pattern-engine');
+      return patternEngine.deletePattern(id);
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
   });
 
   // ── PLUGINS ─────────────────────────────────
@@ -630,6 +744,73 @@ function registerAllHandlers() {
     if (!result.success) return result;
     pluginManager.loadAllPlugins();
     return result;
+  });
+
+  safeHandle('luna:runAutomation', async (_event, data) => {
+    if (!pcControl) pcControl = require('./pc-control');
+    const { actions } = data || {};
+    return await pcControl.runAutomationSequence(actions);
+  });
+
+  // ── SECURITY CENTER ─────────────────────────
+  safeHandle('security:getData', async () => {
+    try {
+      const db = require('./database');
+      const logs = db.prepare('SELECT * FROM security_log ORDER BY timestamp DESC LIMIT 50').all();
+      
+      const strictRow = db.prepare('SELECT value FROM security_settings WHERE key = ?').get('strict_mode');
+      const strictMode = strictRow ? strictRow.value === 'true' : false;
+      
+      const wlRow = db.prepare('SELECT value FROM security_settings WHERE key = ?').get('whitelist');
+      const whitelist = wlRow ? JSON.parse(wlRow.value) : [];
+      
+      const countRow = db.prepare('SELECT COUNT(*) as c FROM security_log WHERE timestamp >= date("now")').get();
+      const blockedCount = countRow ? countRow.c : 0;
+      
+      return { success: true, logs, strictMode, whitelist, blockedCount };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  });
+
+  safeHandle('security:setStrictMode', async (_event, enabled) => {
+    try {
+      const db = require('./database');
+      db.prepare('INSERT OR REPLACE INTO security_settings (key, value) VALUES (?, ?)').run('strict_mode', enabled ? 'true' : 'false');
+      return { success: true };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  });
+
+  safeHandle('security:addWhitelistFolder', async (_event, folderPath) => {
+    try {
+      const db = require('./database');
+      const wlRow = db.prepare('SELECT value FROM security_settings WHERE key = ?').get('whitelist');
+      const whitelist = wlRow ? JSON.parse(wlRow.value) : [];
+      
+      if (!whitelist.includes(folderPath)) {
+        whitelist.push(folderPath);
+        db.prepare('INSERT OR REPLACE INTO security_settings (key, value) VALUES (?, ?)').run('whitelist', JSON.stringify(whitelist));
+      }
+      return { success: true };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  });
+
+  safeHandle('security:removeWhitelistFolder', async (_event, folderPath) => {
+    try {
+      const db = require('./database');
+      const wlRow = db.prepare('SELECT value FROM security_settings WHERE key = ?').get('whitelist');
+      let whitelist = wlRow ? JSON.parse(wlRow.value) : [];
+      
+      whitelist = whitelist.filter(p => p !== folderPath);
+      db.prepare('INSERT OR REPLACE INTO security_settings (key, value) VALUES (?, ?)').run('whitelist', JSON.stringify(whitelist));
+      return { success: true };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
   });
 
   console.log('✅ All IPC handlers registered');

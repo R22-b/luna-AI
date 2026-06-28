@@ -6,7 +6,20 @@
 
 const { spawn } = require('child_process');
 const path = require('path');
+const { dialog } = require('electron');
 const folderManager = require('./folder-manager');
+const db = require('./database');
+
+// Lazy load nut-js so it doesn't crash if native module fails on boot
+let nut = null;
+try {
+  nut = require('@nut-tree-fork/nut-js');
+  // Configure nut.js defaults
+  nut.keyboard.config.autoDelayMs = 50;
+  nut.mouse.config.autoDelayMs = 50;
+} catch (err) {
+  console.error('Failed to load nut-js:', err.message);
+}
 
 // ── Security Constants (HARDCODED — NEVER BYPASS) ──
 const BLOCKED_PATHS = [
@@ -78,8 +91,10 @@ function runPowerShell(command) {
     let stdout = '';
     let stderr = '';
 
+    const buffer = Buffer.from(command, 'utf16le');
+    const base64 = buffer.toString('base64');
     const ps = spawn('powershell.exe', [
-      '-NoProfile', '-NonInteractive', '-Command', command,
+      '-NoProfile', '-NonInteractive', '-EncodedCommand', base64,
     ], {
       shell: false, // ALWAYS false — no shell injection
       timeout: COMMAND_TIMEOUT,
@@ -146,6 +161,8 @@ const APP_MAP = {
   'powershell': 'powershell.exe',
   'cmd': 'cmd.exe',
   'settings': 'ms-settings:',
+  'setting': 'ms-settings:',
+  'control panel': 'control',
   'steam': 'steam.exe',
   'blender': 'blender.exe',
   'gimp': 'gimp-2.10.exe',
@@ -159,7 +176,14 @@ const APP_MAP = {
   'android studio': 'studio64.exe',
   'audacity': 'audacity.exe',
   'telegram': 'Telegram.exe',
-  'whatsapp': 'WhatsApp.exe',
+  'whatsapp': 'whatsapp:', // Windows 10/11 UWP App URI
+  'file manager': 'explorer.exe',
+  'downloads': 'explorer.exe shell:Downloads',
+  'documents': 'explorer.exe shell:Personal',
+  'pictures': 'explorer.exe shell:My Pictures',
+  'videos': 'explorer.exe shell:My Video',
+  'desktop': 'explorer.exe shell:Desktop',
+  'music': 'explorer.exe shell:My Music',
 };
 
 async function openApp(appName, urlArg) {
@@ -168,8 +192,12 @@ async function openApp(appName, urlArg) {
   const lower = appName.toLowerCase().trim();
 
   // Try to find the app in our allowlist
-  const exe = APP_MAP[lower];
+  let exe = APP_MAP[lower];
   if (exe) {
+    // If it's a shell folder command (e.g. explorer.exe shell:Downloads)
+    if (exe.includes('explorer.exe shell:')) {
+      return await runPowerShell(exe); // Run directly
+    }
     if (urlArg) {
       return await runPowerShell(`Start-Process "${exe}" "${urlArg}"`);
     }
@@ -276,6 +304,54 @@ async function controlVolume(action) {
   return await runPowerShell(cmd);
 }
 
+async function setVolume(percentage) {
+  // Use PowerShell Audio API to reliably set volume
+  const normalized = Math.min(100, Math.max(0, percentage)) / 100;
+  const cmd = `
+Add-Type -TypeDefinition @'
+using System;
+using System.Runtime.InteropServices;
+[Guid("5CDF2C82-841E-4546-9722-0CF74078229A"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+interface IAudioEndpointVolume {
+  int NotImpl1(); int NotImpl2(); int NotImpl3(); int NotImpl4();
+  int SetMasterVolumeLevelScalar(float fLevel, System.Guid pguidEventContext);
+  int GetMasterVolumeLevelScalar(out float pfLevel);
+}
+[Guid("D666063F-1587-4E43-81F1-B948E807363F"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+interface IMMDevice { int Activate(ref Guid iid, int dwClsCtx, IntPtr pActivationParams, [MarshalAs(UnmanagedType.IUnknown)] out object ppInterface); }
+[Guid("A95664D2-9614-4F35-A746-DE8DB63617E6"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+interface IMMDeviceEnumerator { int GetDefaultAudioEndpoint(int dataFlow, int role, out IMMDevice ppDevice); }
+[ComImport, Guid("BCDE0395-E52F-467C-8E3D-C4579291692E")] class MMDeviceEnumerator {}
+public class Audio {
+  public static void SetVolume(float level) {
+    var enumerator = new MMDeviceEnumerator() as IMMDeviceEnumerator;
+    IMMDevice dev; enumerator.GetDefaultAudioEndpoint(0, 1, out dev);
+    var iid = typeof(IAudioEndpointVolume).GUID;
+    object o; dev.Activate(ref iid, 23, IntPtr.Zero, out o);
+    var vol = (IAudioEndpointVolume)o;
+    vol.SetMasterVolumeLevelScalar(level, Guid.Empty);
+  }
+}
+'@
+'@
+try {
+  [Audio]::SetVolume(${normalized})
+  Write-Output 'Volume set to ${percentage}%'
+} catch {
+  Write-Error $_
+  exit 1
+}
+`;
+  const result = await runPowerShell(cmd);
+  // Fallback: use SendKeys if the COM approach fails
+  if (!result.success) {
+    const obj = new Array(50).fill('(New-Object -ComObject WScript.Shell).SendKeys([char]174)').join(';');
+    const up = new Array(Math.round(percentage/2)).fill('(New-Object -ComObject WScript.Shell).SendKeys([char]175)').join(';');
+    return await runPowerShell(`${obj};${up}`);
+  }
+  return result;
+}
+
 async function controlMedia(action) {
   const commands = {
     play: '(New-Object -ComObject WScript.Shell).SendKeys([char]179)',
@@ -360,6 +436,87 @@ async function searchPC(query) {
 }
 
 // ══════════════════════════════════════════════
+// MOUSE AND KEYBOARD AUTOMATION
+// ══════════════════════════════════════════════
+
+async function runAutomationSequence(actions) {
+  if (!nut) {
+    return { success: false, error: 'Automation library not loaded (native module failed)' };
+  }
+
+  // Check strict mode
+  try {
+    const strictRow = db.prepare('SELECT value FROM security_settings WHERE key = ?').get('strict_mode');
+    if (strictRow && strictRow.value === 'true') {
+      return { success: false, error: '🔒 Strict Mode is ON. Mouse and Keyboard automation is disabled.' };
+    }
+  } catch (err) {}
+
+  if (!Array.isArray(actions) || actions.length === 0) {
+    return { success: false, error: 'No actions provided' };
+  }
+
+  if (actions.length > 5) {
+    return { success: false, error: '🔒 Security constraint: Cannot chain more than 5 actions per request.' };
+  }
+
+  // Ask for confirmation via Electron dialog
+  const actionListStr = actions.map((a, i) => `${i+1}. ${a.type} ${JSON.stringify(a)}`).join('\n');
+  const response = dialog.showMessageBoxSync({
+    type: 'warning',
+    buttons: ['Allow', 'Block'],
+    defaultId: 1,
+    title: 'Luna Guardian Protocol — Automation Request',
+    message: 'Luna is requesting permission to take control of your mouse/keyboard.',
+    detail: `Action Sequence:\n${actionListStr}\n\nDo you want to allow this? Press Ctrl+Shift+L anytime to abort.`,
+  });
+
+  if (response !== 0) { // User clicked Block or closed
+    db.prepare(`INSERT INTO security_log (action, details, risk_level) VALUES (?, ?, ?)`).run('AUTOMATION_BLOCKED', 'User denied mouse/keyboard automation sequence.', 'high');
+    return { success: false, error: 'User denied automation request' };
+  }
+
+  // Execute the sequence
+  try {
+    for (const action of actions) {
+      db.prepare(`INSERT INTO security_log (action, details, risk_level) VALUES (?, ?, ?)`).run('AUTOMATION_EXEC', `Running: ${action.type}`, 'medium');
+      
+      if (action.type === 'mouseMove') {
+        const p = new nut.Point(action.x, action.y);
+        await nut.mouse.setPosition(p);
+      } else if (action.type === 'click') {
+        let btn = nut.Button.LEFT;
+        if (action.button === 'right') btn = nut.Button.RIGHT;
+        if (action.button === 'middle') btn = nut.Button.MIDDLE;
+        if (action.double) {
+          await nut.mouse.doubleClick(btn);
+        } else {
+          await nut.mouse.click(btn);
+        }
+      } else if (action.type === 'typeText') {
+        await nut.keyboard.type(action.text);
+      } else if (action.type === 'pressKey') {
+        // Simple mapping, can be expanded
+        let keyMap = {
+          'enter': nut.Key.Enter, 'escape': nut.Key.Escape,
+          'tab': nut.Key.Tab, 'space': nut.Key.Space,
+          'win': nut.Key.LeftSuper, 'cmd': nut.Key.LeftSuper
+        };
+        let mapped = keyMap[action.key?.toLowerCase()];
+        if (mapped !== undefined) {
+          await nut.keyboard.type(mapped);
+        }
+      }
+      // Small delay between actions
+      await new Promise(r => setTimeout(r, 200));
+    }
+    return { success: true };
+  } catch (err) {
+    return { success: false, error: `Automation failed: ${err.message}` };
+  }
+}
+
+// ══════════════════════════════════════════════
 // EXPORTS
 // ══════════════════════════════════════════════
 
@@ -368,9 +525,11 @@ module.exports = {
   runPowerShell,
   openApp,
   takeScreenshot,
+  runAutomationSequence,
   getRunningApps,
   getSystemInfo,
   controlVolume,
+  setVolume,
   controlMedia,
   openUrl,
   createFile,

@@ -2,7 +2,7 @@
 const { execSync, spawn } = require('child_process');
 const http = require('http');
 
-const VITE_URL = 'http://localhost:5173';
+const VITE_URL = 'http://127.0.0.1:5173';
 const MAX_RETRIES = 30;
 const RETRY_INTERVAL = 1000;
 

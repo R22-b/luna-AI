@@ -39,11 +39,10 @@ async function generateQuestions(content, count = 10) {
   }], 'Generate educational quiz questions. Return valid JSON only.', 'reasoning');
 
   try {
-    const match = result.content.match(/\[[\s\S]*\]/);
-    const questions = match ? JSON.parse(match[0]) : [];
-    return { success: true, questions };
+    const arr = result.content.match(/\[[\s\S]*\]/)?.[0];
+    return { success: true, questions: JSON.parse(arr) };
   } catch {
-    return { success: true, questions: [], raw: result.content };
+    return { success: false, error: 'Failed to parse questions' };
   }
 }
 
@@ -77,12 +76,29 @@ async function summarizeYouTube(url) {
   if (!videoIdMatch) return { success: false, error: 'invalid YouTube URL' };
 
   const videoId = videoIdMatch[1];
-  const result = await brain.smartCall([{
-    role: 'user',
-    content: `I want a summary of this YouTube video (ID: ${videoId}, URL: ${url}). Since I can't watch it right now, please provide: 1) What the video is likely about based on the URL, 2) Key topics it might cover, 3) Suggest what to look for when watching. Note: I don't have transcript access, so give your best analysis.`,
-  }], 'You are Luna. Be helpful about YouTube content.', 'summarize');
+  try {
+    const { YoutubeTranscript } = require('youtube-transcript');
+    const transcript = await YoutubeTranscript.fetchTranscript(videoId);
+    const text = transcript.map(t => t.text).join(' ');
+    
+    let content = text;
+    if (content.length > 15000) content = content.substring(0, 15000) + '...';
 
-  return { success: true, summary: result.content, videoId, title: `YouTube: ${videoId}`, providerUsed: result.providerUsed };
+    const result = await brain.smartCall([{
+      role: 'user',
+      content: `Summarize this YouTube video transcript. Provide:\n1. Overview (2-3 sentences)\n2. Key Takeaways (bullet list)\n3. Action Items (if any)\n\nTranscript:\n${content}`,
+    }], 'You are Luna. Summarize this video clearly with your Gen-Z personality.', 'summarize');
+
+    return { success: true, summary: result.content, videoId, title: `YouTube: ${videoId}`, providerUsed: result.providerUsed };
+  } catch (err) {
+    // Fallback: search-based summary
+    const search = require('./search-engine');
+    const result = await search.searchAndSummarize(
+      `YouTube ${videoId} video content summary`,
+      'Summarize what this YouTube video is about.'
+    );
+    return { success: true, summary: result.answer, providerUsed: 'search-fallback' };
+  }
 }
 
 async function summarizeLink(url) {

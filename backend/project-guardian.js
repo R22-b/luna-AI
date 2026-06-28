@@ -62,7 +62,7 @@ function createBackup(folderPath, projectName) {
   try {
     const paths = folderManager.getAllFolderPaths();
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const backupDest = path.join(paths.projectBackups, projectName, timestamp);
+    const backupDest = path.join(paths.projectGuardian, projectName, timestamp);
 
     const fileCount = copyDirRecursive(folderPath, backupDest);
     const sizeMb = folderManager.getFolderSize(backupDest);
@@ -83,8 +83,12 @@ function restoreBackup(backupId) {
   if (!backup) return { success: false, error: 'backup not found' };
 
   try {
+    if (fs.existsSync(backup.folder_path)) {
+      fs.rmSync(backup.folder_path, { recursive: true, force: true });
+    }
+    fs.mkdirSync(backup.folder_path, { recursive: true });
     copyDirRecursive(backup.backup_path, backup.folder_path, []);
-    return { success: true, restoredTo: backup.folder_path };
+    return { success: true, message: `Restored to ${backup.folder_path}`, restoredTo: backup.folder_path };
   } catch (err) {
     return { success: false, error: err.message };
   }

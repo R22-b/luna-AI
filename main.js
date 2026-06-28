@@ -3,8 +3,11 @@
 // Built by Ravikiran | Bengaluru | 2026
 // ============================================
 
-const { app, BrowserWindow, Tray, Menu, nativeImage } = require('electron');
+const { app, BrowserWindow, Tray, Menu, nativeImage, globalShortcut } = require('electron');
 const path = require('path');
+
+// Disable hardware acceleration to fix potential black screen issues on some Windows systems
+app.disableHardwareAcceleration();
 
 // Load environment variables
 require('dotenv').config({ path: path.join(__dirname, '.env') });
@@ -12,7 +15,7 @@ require('dotenv').config({ path: path.join(__dirname, '.env') });
 let mainWindow = null;
 let tray = null;
 const isDev = !app.isPackaged;
-const VITE_DEV_URL = 'http://localhost:5173';
+const VITE_DEV_URL = 'http://127.0.0.1:5173';
 
 // ── Single Instance Lock ──────────────────────
 const gotLock = app.requestSingleInstanceLock();
@@ -45,13 +48,40 @@ function createWindow() {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: false,
-      webSecurity: true,
+      webSecurity: false,
+      allowRunningInsecureContent: true,
     },
+  });
+
+  mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription, validatedURL) => {
+    console.error(`❌ Electron failed to load: ${errorDescription} (${errorCode}) at ${validatedURL}`);
+  });
+
+  mainWindow.webContents.on('render-process-gone', (event, details) => {
+    console.error(`❌ Renderer process gone: ${details.reason} (${details.exitCode})`);
   });
 
   // Show window when content is ready (no white flash)
   mainWindow.once('ready-to-show', () => {
     mainWindow.show();
+    if (isDev) mainWindow.webContents.openDevTools({ mode: 'detach' });
+  });
+
+  mainWindow.webContents.on('console-message', (event, level, message, line, sourceId) => {
+    if (level >= 2) {
+      console.log(`[BROWSER ERROR] ${message} (at ${sourceId}:${line})`);
+    } else {
+      console.log(`[BROWSER] ${message}`);
+    }
+  });
+
+  mainWindow.webContents.on('did-finish-load', async () => {
+    try {
+      const html = await mainWindow.webContents.executeJavaScript('document.documentElement.outerHTML');
+      console.log('--- RENDERED HTML ---');
+      console.log(html.substring(0, 1500));
+      console.log('---------------------');
+    } catch(err) {}
   });
 
   // Load content
@@ -100,6 +130,11 @@ async function loadDevServer(retries = 20) {
     }
   }
 }
+
+// ── Cleanup ───────────────────────────────────
+app.on('will-quit', () => {
+  globalShortcut.unregisterAll();
+});
 
 // ── System Tray ───────────────────────────────
 function createTray() {
@@ -168,8 +203,44 @@ function createTray() {
 
 // ── App Lifecycle ─────────────────────────────
 app.whenReady().then(() => {
-  createWindow();
-  createTray();
+  // --- Boot-Time Lockfile & Rollback ---
+  const fs = require('fs');
+  const lockfilePath = path.join(__dirname, 'database', '.booting');
+  
+  if (fs.existsSync(lockfilePath)) {
+    console.error('⚠️ Boot lockfile found! Previous launch crashed. Rolling back self-evolution...');
+    try {
+      const evolution = require('./backend/self-evolution');
+      const db = require('./backend/database');
+      const lastProposal = db.prepare('SELECT id FROM self_evolution_log WHERE success = 1 ORDER BY timestamp DESC LIMIT 1').get();
+      if (lastProposal) {
+        evolution.rollback(lastProposal.id);
+        console.log('✅ Rollback successful. Safe to boot.');
+      }
+    } catch (err) {
+      console.error('❌ Rollback failed:', err.message);
+    }
+  }
+  
+  // Create lockfile for this boot
+  try {
+    if (!fs.existsSync(path.join(__dirname, 'database'))) fs.mkdirSync(path.join(__dirname, 'database'), { recursive: true });
+    fs.writeFileSync(lockfilePath, 'booting', 'utf-8');
+  } catch(e) {}
+
+  try {
+    createWindow();
+    createTray();
+
+  // Initialize folder manager and health check
+  const folderManager = require('./backend/folder-manager');
+  folderManager.init();
+  const healthResult = folderManager.healthCheck();
+  if (healthResult.severity !== 'ok') {
+    const memory = require('./backend/memory');
+    const msg = folderManager.getNotificationMessage(healthResult.severity, healthResult.missing);
+    if (msg) memory.saveMemory('startup_notification', msg, 'system', 10);
+  }
 
   // Initialize backend
   const ipcBridge = require('./backend/ipc-bridge');
@@ -178,6 +249,12 @@ app.whenReady().then(() => {
   // Start AI health checks (non-blocking)
   const brain = require('./backend/brain-manager');
   brain.startHealthChecks();
+
+  // Start autonomous engine
+  try {
+    const autonomous = require('./backend/autonomous-engine');
+    autonomous.startAutonomousEngine();
+  } catch (err) { console.log('🌙 Autonomous engine skipped:', err.message); }
 
   // Start proactive engine
   try {
@@ -220,8 +297,26 @@ app.whenReady().then(() => {
     }
   } catch {}
 
-  console.log('🌙 Luna AI is starting...');
+  // ── Register Global Kill Switch ──────────────
+  globalShortcut.register('CommandOrControl+Shift+L', () => {
+    console.log('🛑 KILL SWITCH ACTIVATED 🛑');
+    const db = require('./backend/database');
+    db.prepare(`INSERT OR REPLACE INTO security_settings (key, value) VALUES (?, ?)`).run('strict_mode', 'true');
+    db.prepare(`INSERT INTO security_log (action, details, risk_level) VALUES (?, ?, ?)`).run('KILL_SWITCH', 'User triggered Ctrl+Shift+L. Strict mode enabled automatically.', 'high');
+    if (mainWindow) {
+      mainWindow.webContents.send('luna:activity', { step: 'KILL SWITCH ACTIVATED. Strict mode ON.', icon: '🛑', timestamp: Date.now() });
+    }
+  });
+
+  console.log('🌙 Luna AI Core initialized');
   console.log(`📂 Mode: ${isDev ? 'Development' : 'Production'}`);
+  } finally {
+    // Safe boot complete - delete lockfile
+    try {
+      const lockfilePath = path.join(__dirname, 'database', '.booting');
+      if (fs.existsSync(lockfilePath)) fs.unlinkSync(lockfilePath);
+    } catch (err) {}
+  }
 });
 
 app.on('window-all-closed', () => {

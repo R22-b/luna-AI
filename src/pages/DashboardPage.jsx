@@ -6,11 +6,14 @@ export default function DashboardPage() {
   const [time, setTime] = useState(new Date());
   const [goals, setGoals] = useState([]);
   const [sysInfo, setSysInfo] = useState(null);
+  const [weather, setWeather] = useState(null);
+  const [news, setNews] = useState(null);
 
   useEffect(() => {
     const timer = setInterval(() => setTime(new Date()), 1000);
     loadGoals();
     loadSystemInfo();
+    loadWeatherAndNews();
     return () => clearInterval(timer);
   }, []);
 
@@ -23,6 +26,16 @@ export default function DashboardPage() {
     try {
       const res = await window.luna?.getSystemInfo();
       if (res?.success) setSysInfo(res);
+    } catch {}
+  }
+
+  async function loadWeatherAndNews() {
+    try {
+      const weatherRes = await window.luna?.getWeather();
+      if (weatherRes?.success) setWeather(weatherRes);
+      
+      const newsRes = await window.luna?.getNews();
+      if (newsRes?.success) setNews(newsRes.articles);
     } catch {}
   }
 
@@ -82,19 +95,41 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Weather & News — with get-key links */}
+      {/* Weather & News */}
       <div className="grid grid-cols-2 gap-4 mb-4">
         <div className="bg-luna-surface border border-luna-border rounded-luna p-4">
           <h3 className="text-xs text-luna-text-muted uppercase mb-2">🌤️ Weather</h3>
-          <p className="text-xs text-luna-text-muted mb-2">add your OpenWeatherMap key to see live weather</p>
-          <a href="https://openweathermap.org/appid" target="_blank" className="text-xs text-luna-primary hover:underline">get free key → openweathermap.org</a>
-          <p className="text-[10px] text-luna-text-muted mt-1">paste it as OPENWEATHER_KEY in .env file</p>
+          {weather ? (
+            <div>
+              <p className="text-2xl text-luna-text-primary font-bold">{Math.round(weather.temp)}°C</p>
+              <p className="text-sm text-luna-text-muted capitalize">{weather.condition} in Bengaluru</p>
+            </div>
+          ) : (
+            <div>
+              <p className="text-xs text-luna-text-muted mb-2">add your OpenWeatherMap key to see live weather</p>
+              <a href="https://openweathermap.org/appid" target="_blank" className="text-xs text-luna-primary hover:underline">get free key → openweathermap.org</a>
+              <p className="text-[10px] text-luna-text-muted mt-1">paste it as OPENWEATHER_KEY in .env file</p>
+            </div>
+          )}
         </div>
         <div className="bg-luna-surface border border-luna-border rounded-luna p-4">
           <h3 className="text-xs text-luna-text-muted uppercase mb-2">📰 News</h3>
-          <p className="text-xs text-luna-text-muted mb-2">add your NewsAPI key to see headlines</p>
-          <a href="https://newsapi.org/register" target="_blank" className="text-xs text-luna-primary hover:underline">get free key → newsapi.org</a>
-          <p className="text-[10px] text-luna-text-muted mt-1">paste it as NEWS_API_KEY in .env file</p>
+          {news ? (
+            <div className="space-y-2">
+              {news.map((item, i) => (
+                <div key={i} className="text-xs">
+                  <a href={item.url} target="_blank" className="text-luna-text-primary hover:text-luna-primary hover:underline block truncate">{item.title}</a>
+                  <span className="text-[10px] text-luna-text-muted">{item.source?.name}</span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div>
+              <p className="text-xs text-luna-text-muted mb-2">add your NewsAPI key to see headlines</p>
+              <a href="https://newsapi.org/register" target="_blank" className="text-xs text-luna-primary hover:underline">get free key → newsapi.org</a>
+              <p className="text-[10px] text-luna-text-muted mt-1">paste it as NEWS_API_KEY in .env file</p>
+            </div>
+          )}
         </div>
       </div>
 

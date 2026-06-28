@@ -52,6 +52,7 @@ db.exec(`
     value TEXT NOT NULL,
     category TEXT DEFAULT 'general',
     importance INTEGER DEFAULT 1,
+    embedding BLOB,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
@@ -119,6 +120,19 @@ db.exec(`
     is_watching INTEGER DEFAULT 1,
     added_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
+
+  CREATE TABLE IF NOT EXISTS security_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    action TEXT NOT NULL,
+    details TEXT,
+    risk_level TEXT DEFAULT 'low',
+    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE TABLE IF NOT EXISTS security_settings (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+  );
 `);
 
 // ── Migration: Add thread_id to conversations if missing ────────────────
@@ -142,7 +156,23 @@ try {
   db.prepare('ALTER TABLE self_evolution_log ADD COLUMN risk_score TEXT DEFAULT "low"').run();
 } catch (err) {}
 
+try {
+  db.prepare('ALTER TABLE self_evolution_log ADD COLUMN proposed_test TEXT').run();
+} catch (err) {}
+
 console.log('✅ All 9 database tables ready');
 
-// ── Export ─────────────────────────────────────
+// ── Database Migrations ───────────────────────
+try {
+  // Add embedding column if it doesn't exist
+  const tableInfo = db.pragma('table_info(memories)');
+  const hasEmbedding = tableInfo.some(col => col.name === 'embedding');
+  if (!hasEmbedding) {
+    db.exec(`ALTER TABLE memories ADD COLUMN embedding BLOB`);
+    console.log('🌙 Migrated: Added embedding column to memories');
+  }
+} catch (e) {
+  console.warn('Migration error:', e.message);
+}
+
 module.exports = db;

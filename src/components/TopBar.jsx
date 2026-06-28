@@ -1,7 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 export default function TopBar() {
   const [isMaximized, setIsMaximized] = useState(false);
+  const [wakeStatus, setWakeStatus] = useState('disabled'); // 'active', 'disabled', 'error'
+
+  useEffect(() => {
+    const handleStatus = (e) => setWakeStatus(e.detail);
+    window.addEventListener('wakeWordStatus', handleStatus);
+    return () => window.removeEventListener('wakeWordStatus', handleStatus);
+  }, []);
 
   const handleMinimize = () => window.windowControls?.minimize();
   const handleMaximize = () => {
@@ -21,6 +28,15 @@ export default function TopBar() {
         <span className="text-[10px] text-luna-text-muted bg-luna-surface px-1.5 py-0.5 rounded">
           2.0
         </span>
+        
+        {/* Wake Word Status Indicator */}
+        <div 
+          className="flex items-center gap-1.5 ml-2 bg-luna-surface border border-luna-border px-2 py-0.5 rounded"
+          title={wakeStatus === 'active' ? 'Wake Word: Listening' : 'Wake Word: Disabled/Error'}
+        >
+          <div className={`w-1.5 h-1.5 rounded-full ${wakeStatus === 'active' ? 'bg-green-500 shadow-[0_0_5px_#22c55e] animate-pulse' : wakeStatus === 'error' ? 'bg-red-500' : 'bg-gray-600'}`} />
+          <span className="text-[9px] uppercase tracking-wider text-luna-text-muted">Wake</span>
+        </div>
       </div>
 
       {/* Center — Luna message */}

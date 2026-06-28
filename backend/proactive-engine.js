@@ -12,7 +12,14 @@ function startProactiveEngine(nickname = 'baddy', mainWindow = null) {
   // Morning briefing at 8 AM
   jobs.morning = schedule.scheduleJob('0 8 * * *', async () => {
     const goals = memory.getActiveGoals();
-    const msg = `yo ${nickname}! good morning ☀️\n\n🎯 you have ${goals.length} active goal${goals.length !== 1 ? 's' : ''}.\nlet's crush it today 🔥`;
+    const brain = require('./brain-manager');
+    const result = await brain.smartCall([{
+      role: 'user',
+      content: `Morning! Give me a witty, Gen-Z morning briefing for ${nickname}. I have ${goals.length} active goals right now. Be sarcastic but encouraging.`
+    }], 'You are Luna giving a morning briefing.', 'chat');
+    
+    const msg = result.success ? result.content : `yo ${nickname}! good morning ☀️\n\n🎯 you have ${goals.length} active goals.\nlet's crush it today 🔥`;
+    
     if (mainWindow) mainWindow.webContents.send('luna:notification', { title: 'Good Morning!', body: msg });
     memory.saveConversation('luna', msg, 'neutral', 'proactive');
   });
@@ -60,6 +67,16 @@ function startProactiveEngine(nickname = 'baddy', mainWindow = null) {
         const msg = funMessages[Math.floor(Math.random() * funMessages.length)];
         if (mainWindow) mainWindow.webContents.send('luna:notification', { title: 'Luna misses you', body: msg });
       }
+    }
+  });
+
+  // Pattern Detection every day at 3 AM
+  jobs.patternAnalysis = schedule.scheduleJob('0 3 * * *', async () => {
+    try {
+      const patternEngine = require('./pattern-engine');
+      await patternEngine.runDailyPatternAnalysis();
+    } catch (err) {
+      console.error('Pattern analysis scheduled job failed:', err.message);
     }
   });
 

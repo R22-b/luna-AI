@@ -30,6 +30,7 @@ async function search(query, numResults = 5) {
         timeout: 10000,
       });
 
+      console.log('Serper result:', JSON.stringify(res.data.organic?.slice(0,2)));
       const results = (res.data.organic || []).slice(0, numResults).map(item => ({
         title: item.title,
         snippet: item.snippet,
@@ -175,10 +176,78 @@ async function fetchPageContent(url) {
 }
 
 /**
+ * Fetch webpage content using a hidden Electron background window.
+ * This runs JS, renders client-side webapps, and bypasses standard bot-blockers.
+ */
+async function fetchPageContentElectron(url) {
+  try {
+    const { BrowserWindow } = require('electron');
+    return new Promise((resolve) => {
+      let win = new BrowserWindow({
+        show: false, // hidden
+        webPreferences: {
+          nodeIntegration: false,
+          contextIsolation: true,
+          webSecurity: false
+        }
+      });
+
+      // 12-second load timeout
+      const timeout = setTimeout(() => {
+        if (win) {
+          try { win.destroy(); } catch {}
+          resolve({ success: false, error: 'Scraping timeout (12s)' });
+        }
+      }, 12000);
+
+      win.loadURL(url, {
+        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+      }).then(async () => {
+        try {
+          // Wait 1.5s for dynamic elements or framework render
+          await new Promise(r => setTimeout(r, 1500));
+          if (!win || win.isDestroyed()) return;
+
+          const title = await win.webContents.executeJavaScript('document.title');
+          const text = await win.webContents.executeJavaScript('document.body.innerText');
+
+          clearTimeout(timeout);
+          try { win.destroy(); } catch {}
+          win = null;
+
+          let cleanedText = (text || '').replace(/\s+/g, ' ').trim();
+          if (cleanedText.length > 8000) {
+            cleanedText = cleanedText.substring(0, 8000) + '... [truncated]';
+          }
+
+          resolve({ success: true, content: cleanedText, title });
+        } catch (err) {
+          clearTimeout(timeout);
+          try { if (win) win.destroy(); } catch {}
+          resolve({ success: false, error: err.message });
+        }
+      }).catch((err) => {
+        clearTimeout(timeout);
+        try { if (win) win.destroy(); } catch {}
+        resolve({ success: false, error: err.message });
+      });
+    });
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+}
+
+/**
  * Retry fetch via alternative public mirror domains for social links
  * that often block default bot/user-agent requests.
  */
 async function fetchPageContentWithFallback(url) {
+  // Try Electron background window rendering FIRST (super dynamic, supports JS)
+  console.log(`[Luna Scraper] Headless Electron crawling: ${url}`);
+  const electronTry = await fetchPageContentElectron(url);
+  if (electronTry.success) return electronTry;
+
+  console.log(`[Luna Scraper] Headless failed (${electronTry.error}), falling back to axios static fetch...`);
   const firstTry = await fetchPageContent(url);
   if (firstTry.success) return firstTry;
 

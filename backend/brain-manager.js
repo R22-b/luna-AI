@@ -5,25 +5,27 @@
 // ============================================
 
 const axios = require('axios');
+const Store = require('electron-store');
+const store = new Store();
 
 // ── Provider Configurations ───────────────────
 const PROVIDERS = {
   groq: {
     name: 'Groq',
-    model: 'llama-3.1-8b-instant',
+    model: 'llama-3.3-70b-versatile',
     url: 'https://api.groq.com/openai/v1/chat/completions',
     keyEnv: 'GROQ_API_KEY',
     format: 'openai',
   },
   gemini: {
-    name: 'Gemini',
-    model: process.env.GEMINI_MODEL || 'gemini-1.5-flash',
+    name: 'Gemini (Pro)',
+    model: 'gemini-2.5-pro', // Upgraded to Pro for elite 3D coding & complex architecture
     keyEnv: 'GEMINI_API_KEY',
     format: 'gemini',
   },
   openrouter: {
-    name: 'OpenRouter',
-    model: 'openai/gpt-3.5-turbo',
+    name: 'OpenRouter (Claude/Premium)',
+    model: 'anthropic/claude-3.7-sonnet', // Absolute best for coding & UI design
     url: 'https://openrouter.ai/api/v1/chat/completions',
     keyEnv: 'OPENROUTER_API_KEY',
     format: 'openai',
@@ -36,43 +38,203 @@ const PROVIDERS = {
     format: 'cohere',
   },
   mistral: {
-    name: 'Mistral',
-    model: 'mistral-small-latest',
+    name: 'Mistral (Large)',
+    model: 'mistral-large-latest',
     url: 'https://api.mistral.ai/v1/chat/completions',
     keyEnv: 'MISTRAL_API_KEY',
     format: 'openai',
   },
   together: {
-    name: 'Together AI',
-    model: 'meta-llama/Llama-3-8b-chat-hf',
+    name: 'Together AI (Llama 3.3)',
+    model: 'meta-llama/Llama-3.3-70B-Instruct-Turbo',
     url: 'https://api.together.xyz/v1/chat/completions',
     keyEnv: 'TOGETHER_API_KEY',
     format: 'openai',
   },
   huggingface: {
-    name: 'HuggingFace',
-    model: 'mistralai/Mistral-7B-Instruct-v0.3',
-    url: 'https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.3',
+    name: 'HuggingFace (Llama 3)',
+    model: 'meta-llama/Meta-Llama-3-8B-Instruct',
+    url: 'https://api-inference.huggingface.co/models/meta-llama/Meta-Llama-3-8B-Instruct/v1/chat/completions',
     keyEnv: 'HF_API_KEY',
-    format: 'huggingface',
+    format: 'openai',
+  },
+  huggingface_gemma: {
+    name: 'HuggingFace (Gemma 2)',
+    model: 'google/gemma-2-9b-it',
+    url: 'https://api-inference.huggingface.co/models/google/gemma-2-9b-it/v1/chat/completions',
+    keyEnv: 'HF_API_KEY',
+    format: 'openai',
+  },
+  huggingface_mistral: {
+    name: 'HuggingFace (Mistral Nemo)',
+    model: 'mistralai/Mistral-Nemo-Instruct-2407',
+    url: 'https://api-inference.huggingface.co/models/mistralai/Mistral-Nemo-Instruct-2407/v1/chat/completions',
+    keyEnv: 'HF_API_KEY',
+    format: 'openai',
   },
   pollinations: {
     name: 'Pollinations',
     model: 'openai',
     url: 'https://text.pollinations.ai/openai',
-    keyEnv: null, // Free, no key needed
+    keyEnv: null,
     format: 'openai-poll',
+  },
+  deepseek: {
+    name: 'DeepSeek (Coder)',
+    model: 'deepseek-coder',
+    url: 'https://api.deepseek.com/chat/completions',
+    keyEnv: 'DEEPSEEK_API_KEY',
+    format: 'openai',
+  },
+  cerebras: {
+    name: 'Cerebras (Llama 3.1 70B)',
+    model: 'llama3.1-70b', // Fixed broken model name
+    url: 'https://api.cerebras.ai/v1/chat/completions',
+    keyEnv: 'CEREBRAS_API_KEY',
+    format: 'openai',
+  },
+  openrouter_gemini: {
+    name: 'OpenRouter (Gemini Flash Free)',
+    model: 'google/gemini-2.5-flash:free',
+    url: 'https://openrouter.ai/api/v1/chat/completions',
+    keyEnv: 'OPENROUTER_API_KEY',
+    format: 'openai',
+  },
+  openrouter_llama: {
+    name: 'OpenRouter (Llama Free)',
+    model: 'meta-llama/llama-3.1-8b-instruct:free',
+    url: 'https://openrouter.ai/api/v1/chat/completions',
+    keyEnv: 'OPENROUTER_API_KEY',
+    format: 'openai',
+  },
+  openrouter_qwen: {
+    name: 'OpenRouter (Qwen Coder Free)',
+    model: 'qwen/qwen-2.5-coder-32b-instruct:free', // Incredible free coding model
+    url: 'https://openrouter.ai/api/v1/chat/completions',
+    keyEnv: 'OPENROUTER_API_KEY',
+    format: 'openai',
+  },
+  together_small: {
+    name: 'Together AI (Llama 3.2)',
+    model: 'meta-llama/Llama-3.2-3B-Instruct-Turbo',
+    url: 'https://api.together.xyz/v1/chat/completions',
+    keyEnv: 'TOGETHER_API_KEY',
+    format: 'openai',
+  },
+  openrouter_deepseek_r1: {
+    name: 'OpenRouter (DeepSeek R1 Free)',
+    model: 'deepseek/deepseek-r1:free',
+    url: 'https://openrouter.ai/api/v1/chat/completions',
+    keyEnv: 'OPENROUTER_API_KEY',
+    format: 'openai',
+  },
+  openrouter_mistral: {
+    name: 'OpenRouter (Mistral Nemo Free)',
+    model: 'mistralai/mistral-nemo:free',
+    url: 'https://openrouter.ai/api/v1/chat/completions',
+    keyEnv: 'OPENROUTER_API_KEY',
+    format: 'openai',
+  },
+  openrouter_phi: {
+    name: 'OpenRouter (Microsoft Phi-3 Free)',
+    model: 'microsoft/phi-3-mini-128k-instruct:free',
+    url: 'https://openrouter.ai/api/v1/chat/completions',
+    keyEnv: 'OPENROUTER_API_KEY',
+    format: 'openai',
+  },
+  openrouter_llama_70b: {
+    name: 'OpenRouter (Llama 3 70B Free)',
+    model: 'meta-llama/llama-3.3-70b-instruct:free',
+    url: 'https://openrouter.ai/api/v1/chat/completions',
+    keyEnv: 'OPENROUTER_API_KEY',
+    format: 'openai',
+  },
+  openrouter_liquid: {
+    name: 'OpenRouter (Liquid LFM Free)',
+    model: 'liquid/lfm-40b:free',
+    url: 'https://openrouter.ai/api/v1/chat/completions',
+    keyEnv: 'OPENROUTER_API_KEY',
+    format: 'openai',
+  },
+  together_qwen: {
+    name: 'Together AI (Qwen Coder)',
+    model: 'Qwen/Qwen2.5-Coder-32B-Instruct',
+    url: 'https://api.together.xyz/v1/chat/completions',
+    keyEnv: 'TOGETHER_API_KEY',
+    format: 'openai',
+  },
+  sambanova: {
+    name: 'SambaNova (Llama 3.3 70B)',
+    model: 'Meta-Llama-3.3-70B-Instruct',
+    url: 'https://api.sambanova.ai/v1/chat/completions',
+    keyEnv: 'SAMBANOVA_API_KEY',
+    format: 'openai',
+  },
+  nvidia_nim: {
+    name: 'NVIDIA NIM (Llama 3.1 70B)',
+    model: 'meta/llama-3.1-70b-instruct',
+    url: 'https://integrate.api.nvidia.com/v1/chat/completions',
+    keyEnv: 'NVIDIA_API_KEY',
+    format: 'openai',
+  },
+  nvidia_nim_nemotron: {
+    name: 'NVIDIA NIM (Nemotron)',
+    model: 'nvidia/llama-3.1-nemotron-70b-instruct',
+    url: 'https://integrate.api.nvidia.com/v1/chat/completions',
+    keyEnv: 'NVIDIA_API_KEY',
+    format: 'openai',
+  },
+  openrouter_gemma3: {
+    name: 'OpenRouter (Gemma 3 27B Free)',
+    model: 'google/gemma-3-27b-it:free',
+    url: 'https://openrouter.ai/api/v1/chat/completions',
+    keyEnv: 'OPENROUTER_API_KEY',
+    format: 'openai',
   },
 };
 
+// ── Response Cache (avoids duplicate API calls) ──
+const responseCache = new Map();
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+function getCacheKey(messages, systemPrompt) {
+  const lastMsg = messages[messages.length - 1]?.content || '';
+  return `${systemPrompt.slice(0, 50)}::${lastMsg.slice(0, 200)}`;
+}
+
+function getCachedResponse(key) {
+  const cached = responseCache.get(key);
+  if (cached && (Date.now() - cached.timestamp < CACHE_TTL)) {
+    console.log('🧠 Cache HIT — skipping API call');
+    return cached.response;
+  }
+  if (cached) responseCache.delete(key); // expired
+  return null;
+}
+
+function setCachedResponse(key, response) {
+  // Keep cache small — max 100 entries
+  if (responseCache.size > 100) {
+    const firstKey = responseCache.keys().next().value;
+    responseCache.delete(firstKey);
+  }
+  if (responseCache.size > 500) {
+    const firstKey = responseCache.keys().next().value;
+    responseCache.delete(firstKey);
+  }
+  responseCache.set(key, { response, timestamp: Date.now() });
+}
+
 // ── Task Type → Provider Priority ─────────────
 const TASK_PRIORITIES = {
-  chat:      ['groq', 'gemini', 'pollinations', 'openrouter'],
-  reasoning: ['gemini', 'openrouter', 'pollinations', 'groq'],
-  code:      ['gemini', 'pollinations', 'groq', 'openrouter', 'mistral'],
-  summarize: ['gemini', 'openrouter', 'pollinations', 'groq'],
-  creative:  ['gemini', 'together', 'pollinations', 'openrouter'],
-  research:  ['gemini', 'pollinations', 'openrouter', 'groq'],
+  chat:      ['openrouter_llama_70b', 'groq', 'gemini', 'sambanova', 'openrouter_mistral', 'openrouter_gemini', 'nvidia_nim', 'openrouter_llama', 'cohere', 'cerebras', 'openrouter_gemma3', 'openrouter_liquid', 'nvidia_nim_nemotron', 'pollinations', 'together', 'openrouter'],
+  reasoning: ['openrouter_deepseek_r1', 'openrouter', 'gemini', 'nvidia_nim_nemotron', 'deepseek', 'sambanova', 'openrouter_qwen', 'cohere', 'groq', 'together_qwen', 'cerebras', 'nvidia_nim', 'pollinations'],
+  code:      ['openrouter_qwen', 'openrouter_llama_70b', 'openrouter', 'gemini', 'nvidia_nim', 'deepseek', 'sambanova', 'together_qwen', 'mistral', 'groq', 'cerebras', 'nvidia_nim_nemotron', 'pollinations', 'openrouter_gemini'],
+  summarize: ['openrouter_phi', 'gemini', 'openrouter_liquid', 'openrouter', 'sambanova', 'cohere', 'openrouter_gemini', 'openrouter_gemma3', 'cerebras', 'nvidia_nim', 'pollinations', 'groq', 'huggingface', 'openrouter_llama'],
+  creative:  ['openrouter_mistral', 'openrouter_liquid', 'gemini', 'openrouter', 'sambanova', 'together', 'huggingface_mistral', 'nvidia_nim_nemotron', 'pollinations', 'openrouter_qwen', 'openrouter_gemma3', 'cerebras', 'groq', 'together_qwen'],
+  research:  ['openrouter_llama_70b', 'openrouter_deepseek_r1', 'openrouter', 'gemini', 'sambanova', 'nvidia_nim', 'deepseek', 'cohere', 'openrouter_gemini', 'groq', 'cerebras', 'nvidia_nim_nemotron', 'pollinations', 'openrouter_llama'],
+  project_build: ['openrouter_qwen', 'openrouter_llama_70b', 'openrouter', 'gemini', 'nvidia_nim', 'sambanova', 'deepseek', 'together_qwen', 'mistral', 'groq', 'openrouter_gemini', 'nvidia_nim_nemotron', 'cohere', 'pollinations'],
+  plugin_build:  ['openrouter_qwen', 'openrouter', 'gemini', 'nvidia_nim', 'sambanova', 'deepseek', 'together_qwen', 'mistral', 'groq', 'openrouter_gemini', 'cohere', 'pollinations'],
 };
 
 // ── State ─────────────────────────────────────
@@ -91,7 +253,8 @@ for (const key of Object.keys(PROVIDERS)) {
 function getKey(providerName) {
   const provider = PROVIDERS[providerName];
   if (!provider || !provider.keyEnv) return null;
-  return process.env[provider.keyEnv] || null;
+  // Read from electron-store first, fallback to process.env
+  return store.get(provider.keyEnv) || process.env[provider.keyEnv] || null;
 }
 
 // ── Call Individual Provider ──────────────────
@@ -135,7 +298,10 @@ async function callProvider(providerName, messages, systemPrompt = '', maxTokens
         // Pollinations — free, no API key
         const msgs = [];
         if (systemPrompt) msgs.push({ role: 'system', content: systemPrompt });
-        msgs.push(...messages);
+        msgs.push(...messages.map(m => ({
+          role: m.role,
+          content: Array.isArray(m.content) ? (m.content.find(c => c.type === 'text')?.text || '') : m.content
+        })));
 
         const res = await axios.post('https://text.pollinations.ai/openai', {
           model: 'openai',
@@ -146,6 +312,11 @@ async function callProvider(providerName, messages, systemPrompt = '', maxTokens
           timeout: 30000,
         });
         content = res.data.choices[0].message.content;
+        
+        // Remove Pollinations text ads
+        content = content.replace(/---[\s\n]*\*\*Support Pollinations\.AI:?\*\*[\s\S]*$/i, '')
+                         .replace(/🌸 \*\*Ad\*\* 🌸[\s\S]*$/i, '')
+                         .trim();
         break;
       }
 
@@ -158,7 +329,25 @@ async function callProvider(providerName, messages, systemPrompt = '', maxTokens
           parts.push({ text: `System: ${systemPrompt}\n\n` });
         }
         for (const msg of messages) {
-          parts.push({ text: `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content}\n` });
+          if (Array.isArray(msg.content)) {
+            // Multi-modal Vision Support
+            for (const item of msg.content) {
+              if (item.type === 'text') {
+                parts.push({ text: `${msg.role === 'user' ? 'User' : 'Assistant'}: ${item.text}\n` });
+              } else if (item.type === 'image_url') {
+                const b64Data = item.image_url.url.split(',')[1];
+                const mimeType = item.image_url.url.split(';')[0].split(':')[1] || 'image/png';
+                parts.push({
+                  inlineData: {
+                    mimeType: mimeType,
+                    data: b64Data
+                  }
+                });
+              }
+            }
+          } else {
+            parts.push({ text: `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content}\n` });
+          }
         }
 
         const res = await axios.post(url, {
@@ -180,12 +369,13 @@ async function callProvider(providerName, messages, systemPrompt = '', maxTokens
         let lastUserMsg = '';
 
         for (const msg of messages) {
+          const textContent = Array.isArray(msg.content) ? (msg.content.find(c => c.type === 'text')?.text || '') : msg.content;
           if (msg.role === 'user') {
-            lastUserMsg = msg.content;
+            lastUserMsg = textContent;
           } else {
             chatHistory.push({
               role: msg.role === 'assistant' ? 'CHATBOT' : 'USER',
-              message: msg.content,
+              message: textContent,
             });
           }
         }
@@ -209,7 +399,10 @@ async function callProvider(providerName, messages, systemPrompt = '', maxTokens
       }
 
       case 'huggingface': {
-        const prompt = messages.map(m => `${m.role}: ${m.content}`).join('\n');
+        const prompt = messages.map(m => {
+          const textContent = Array.isArray(m.content) ? (m.content.find(c => c.type === 'text')?.text || '') : m.content;
+          return `${m.role}: ${textContent}`;
+        }).join('\n');
         const fullPrompt = systemPrompt ? `${systemPrompt}\n\n${prompt}` : prompt;
 
         const res = await axios.post(provider.url, {
@@ -291,7 +484,7 @@ function startHealthChecks() {
   healthCheck();
 
   // Then every 3 minutes
-  healthInterval = setInterval(healthCheck, 3 * 60 * 1000);
+  // healthInterval = setInterval(healthCheck, 3 * 60 * 1000); // KILLED FOR v2.0
 }
 
 function stopHealthChecks() {
@@ -326,6 +519,13 @@ async function smartCall(messages, systemPrompt = '', taskType = 'chat') {
   const priorities = TASK_PRIORITIES[taskType] || TASK_PRIORITIES.chat;
   const tried = [];
 
+  // Check cache first (skip for code/project tasks which should always be fresh)
+  if (taskType !== 'code' && taskType !== 'project_build' && taskType !== 'plugin_build') {
+    const cacheKey = getCacheKey(messages, systemPrompt);
+    const cached = getCachedResponse(cacheKey);
+    if (cached) return cached;
+  }
+
   // Determine token limits based on task type
   const maxTokens = (taskType === 'code' || taskType === 'project_build') ? 8000 : 1500;
 
@@ -357,12 +557,18 @@ async function smartCall(messages, systemPrompt = '', taskType = 'chat') {
     const result = await callProvider(providerName, messages, systemPrompt, maxTokens);
 
     if (result.success) {
-      return {
+      const response = {
         success: true,
         content: result.content,
         providerUsed: PROVIDERS[providerName].name,
         latency: result.latency,
       };
+      // Cache the response for future identical questions
+      if (taskType !== 'code' && taskType !== 'project_build' && taskType !== 'plugin_build') {
+        const cacheKey = getCacheKey(messages, systemPrompt);
+        setCachedResponse(cacheKey, response);
+      }
+      return response;
     }
 
     console.log(`⚠️ ${PROVIDERS[providerName].name} failed, trying next...`);

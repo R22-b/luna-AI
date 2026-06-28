@@ -2,6 +2,7 @@ import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import TopBar from './components/TopBar';
 import Sidebar from './components/Sidebar';
+import WakeWordEngine from './components/WakeWordEngine';
 
 // Lazy load all pages
 const ChatPage = lazy(() => import('./pages/ChatPage'));
@@ -71,6 +72,7 @@ export default function App() {
   return (
     <Router>
       <div className="flex flex-col h-screen bg-black overflow-hidden">
+        <WakeWordEngine />
         <TopBar />
         <div className="flex flex-1 overflow-hidden">
           <Sidebar collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} />

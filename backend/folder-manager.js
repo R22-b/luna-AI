@@ -30,26 +30,28 @@ function getDesktopPath() {
  * Get current workspace base path (Desktop or custom)
  */
 function getWorkspacePath() {
-  return customBasePath || getDesktopPath();
+  const base = customBasePath || getDesktopPath();
+  return path.join(base, 'Luna_v2_Vault');
 }
 
 /**
  * Get all Luna folder paths based on a base path
  */
 function getAllFolderPaths(basePath = null) {
-  const base = basePath || getWorkspacePath();
+  const base = basePath ? path.join(basePath, 'Luna_v2_Vault') : getWorkspacePath();
   return {
+    vault: base,
     workspace: path.join(base, 'Luna_Workspace'),
-    projects: path.join(base, 'Luna_Workspace', 'projects'),
-    docs: path.join(base, 'Luna_Workspace', 'docs'),
-    exports: path.join(base, 'Luna_Workspace', 'exports'),
     plugins: path.join(base, 'Luna_Workspace', 'plugins'),
     media: path.join(base, 'Luna_Media'),
-    images: path.join(base, 'Luna_Media', 'images'),
-    videos: path.join(base, 'Luna_Media', 'videos'),
-    backups: path.join(base, 'Luna_Backups'),
-    projectBackups: path.join(base, 'Luna_Backups', 'projects'),
-    evolutionBackups: path.join(base, 'Luna_Backups', 'evolution'),
+    images: path.join(base, 'Luna_Media', 'Images'),
+    videos: path.join(base, 'Luna_Media', 'Videos'),
+    audio: path.join(base, 'Luna_Media', 'Audio'),
+    documents: path.join(base, 'Luna_Media', 'Documents'),
+    system: path.join(base, 'Luna_System'),
+    backups: path.join(base, 'Luna_System', 'Backups'),
+    projectGuardian: path.join(base, 'Luna_System', 'Project_Guardian'),
+    logs: path.join(base, 'Luna_System', 'Logs'),
   };
 }
 
@@ -90,9 +92,9 @@ function healthCheck() {
   let severity = 'ok';
 
   // Main folders (major if missing)
-  const mainFolders = ['workspace', 'media', 'backups'];
+  const mainFolders = ['vault', 'workspace', 'media', 'system'];
   // Sub folders (minor if missing)
-  const subFolders = ['projects', 'docs', 'exports', 'plugins', 'images', 'videos', 'projectBackups', 'evolutionBackups'];
+  const subFolders = ['plugins', 'images', 'videos', 'audio', 'documents', 'backups', 'projectGuardian', 'logs'];
 
   // Check all folders
   for (const [name, folderPath] of Object.entries(paths)) {
@@ -108,7 +110,7 @@ function healthCheck() {
       }
 
       // Determine severity
-      if (name === 'backups' || name === 'projectBackups' || name === 'evolutionBackups') {
+      if (name === 'system' || name === 'backups' || name === 'projectGuardian') {
         severity = 'critical';
       } else if (mainFolders.includes(name) && severity !== 'critical') {
         severity = 'major';
@@ -134,9 +136,9 @@ function getNotificationMessage(severity, missingFolders) {
     case 'minor':
       return null; // Silent recreate, no notification
     case 'major':
-      return `baddy I noticed some folders were missing 👀 recreated them for you. your old files might be gone though — check Luna_Backups if you need them!`;
+      return `baddy I noticed some Luna folders were missing 👀 recreated them for you!`;
     case 'critical':
-      return `⚠️ baddy Luna_Backups is missing — no rollback available right now. recreating the folder. future backups are safe. but old backups are gone permanently.`;
+      return `⚠️ baddy Luna_System is missing — no rollback available right now. recreating the folder. future backups are safe. but old backups are gone permanently.`;
     default:
       return null;
   }
@@ -218,17 +220,21 @@ function getFolderSize(folderPath) {
 }
 
 // ── Run health check on module load ───────────
-const initResult = healthCheck();
-if (initResult.healthy) {
-  console.log('📁 All Luna folders healthy ✅');
-} else {
-  console.log(`📁 Folder health: ${initResult.severity} — recreated: ${initResult.recreated.join(', ')}`);
-  const msg = getNotificationMessage(initResult.severity, initResult.missing);
-  if (msg) console.log(`📁 ${msg}`);
+function init() {
+  createAllFolders();
+  const initResult = healthCheck();
+  if (initResult.healthy) {
+    console.log('📁 All Luna folders healthy ✅');
+  } else {
+    console.log(`📁 Folder health: ${initResult.severity} — recreated: ${initResult.recreated.join(', ')}`);
+    const msg = getNotificationMessage(initResult.severity, initResult.missing);
+    if (msg) console.log(`📁 ${msg}`);
+  }
 }
 
 // ── Export ─────────────────────────────────────
 module.exports = {
+  init,
   getDesktopPath,
   getWorkspacePath,
   getAllFolderPaths,

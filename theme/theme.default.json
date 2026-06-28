@@ -1,0 +1,14 @@
+{
+  "colors": {
+    "primary": "#7c3aed",
+    "bg": "#000000",
+    "surface": "#07070f",
+    "border": "#1a1a2e",
+    "accent": "#1e8fa0",
+    "textPrimary": "#c4c4d4",
+    "textMuted": "#4a4a6a"
+  },
+  "fonts": { "size": "13px", "family": "Inter" },
+  "radius": "12px",
+  "spacing": "comfortable"
+}

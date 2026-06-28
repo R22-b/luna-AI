@@ -10,11 +10,14 @@ export default function ChatBubble({ role, content, timestamp, providerUsed, emo
       {isLuna && badges && badges.length > 0 && (
         <div className="flex gap-1.5 mb-1 ml-1">
           {badges.map((badge, i) => (
-            <span key={i} className="flex items-center gap-1 text-[10px] text-luna-text-muted">
+            <span key={i} className="flex items-center gap-1 text-[9px] font-black tracking-tighter uppercase text-luna-text-muted bg-white/[0.02] px-1.5 py-0.5 rounded-full border border-white/5">
               <span className={`w-1.5 h-1.5 rounded-full ${
-                badge === 'ARCHITECT' ? 'bg-blue-400' :
-                badge === 'TINY_CODER' ? 'bg-purple-400' :
-                'bg-yellow-400'
+                badge === 'ARCHITECT' ? 'bg-blue-400 shadow-[0_0_5px_rgba(96,165,250,0.8)]' :
+                badge === 'BUILDER' ? 'bg-purple-400 shadow-[0_0_5px_rgba(192,132,252,0.8)]' :
+                badge === 'VERIFIER' ? 'bg-green-400 shadow-[0_0_5px_rgba(74,222,128,0.8)]' :
+                badge === 'RESEARCHER' ? 'bg-yellow-400 shadow-[0_0_5px_rgba(250,204,21,0.8)]' :
+                badge === 'AUTONOMOUS' ? 'bg-orange-500 animate-pulse shadow-[0_0_8px_rgba(249,115,22,0.8)]' :
+                'bg-gray-400'
               }`} />
               {badge}
             </span>

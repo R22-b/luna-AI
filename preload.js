@@ -21,6 +21,7 @@ const ALLOWED_INVOKE = [
   'luna:getThreads',
   'luna:deleteThread',
   'luna:renameThread',
+  'luna:runAutomation',
   // Memory
   'luna:getMemories',
   'luna:saveMemory',
@@ -44,6 +45,10 @@ const ALLOWED_INVOKE = [
   'luna:getFolderPaths',
   'luna:isFirstRun',
   'luna:completeSetup',
+  'luna:getWeather',
+  'luna:getNews',
+  'luna:getStartupState',
+  'luna:toggleStartup',
   // Guardian
   'guardian:addProject',
   'guardian:removeProject',
@@ -59,6 +64,8 @@ const ALLOWED_INVOKE = [
   'evolution:runCycle',
   'evolution:applyProposal',
   'evolution:rejectProposal',
+  'pattern:getAll',
+  'pattern:delete',
   // Voice
   'voice:speak',
   'voice:getStatus',
@@ -75,6 +82,10 @@ const ALLOWED_INVOKE = [
   // API Keys
   'luna:getApiKeys',
   'luna:saveApiKey',
+  // Settings
+  'settings:save-key',
+  'settings:get-key',
+  'settings:get-all-keys',
   // Folder
   'luna:openFolder',
   // Student tools
@@ -93,6 +104,11 @@ const ALLOWED_INVOKE = [
   'plugins:importFolder',
   'plugins:getDir',
   'plugins:createScaffold',
+  // Security
+  'security:getData',
+  'security:setStrictMode',
+  'security:addWhitelistFolder',
+  'security:removeWhitelistFolder',
 ];
 
 const ALLOWED_ON = [
@@ -142,6 +158,7 @@ contextBridge.exposeInMainWorld('luna', {
   getThreads: () => safeInvoke('luna:getThreads'),
   deleteThread: (id) => safeInvoke('luna:deleteThread', { id }),
   renameThread: (id, title) => safeInvoke('luna:renameThread', { id, title }),
+  runAutomation: (actions) => safeInvoke('luna:runAutomation', { actions }),
 
   // Memory
   getMemories: () => safeInvoke('luna:getMemories'),
@@ -176,6 +193,8 @@ contextBridge.exposeInMainWorld('luna', {
   getApiKeys: () => safeInvoke('luna:getApiKeys'),
   saveApiKey: (data) => safeInvoke('luna:saveApiKey', data),
   openFolder: (data) => safeInvoke('luna:openFolder', data),
+  getWeather: () => safeInvoke('luna:getWeather'),
+  getNews: () => safeInvoke('luna:getNews'),
 
   // Events
   on: (channel, callback) => safeOn(channel, callback),
@@ -198,6 +217,8 @@ contextBridge.exposeInMainWorld('evolution', {
   runCycle: () => safeInvoke('evolution:runCycle'),
   applyProposal: (data) => safeInvoke('evolution:applyProposal', data),
   rejectProposal: (data) => safeInvoke('evolution:rejectProposal', data),
+  getPatterns: () => safeInvoke('pattern:getAll'),
+  deletePattern: (id) => safeInvoke('pattern:delete', id),
 });
 
 contextBridge.exposeInMainWorld('voice', {
@@ -217,6 +238,8 @@ contextBridge.exposeInMainWorld('system', {
   completeSetup: () => safeInvoke('luna:completeSetup'),
   getSystemInfo: () => safeInvoke('luna:getSystemInfo'),
   getFolderPaths: () => safeInvoke('luna:getFolderPaths'),
+  getStartupState: () => safeInvoke('luna:getStartupState'),
+  toggleStartup: (data) => safeInvoke('luna:toggleStartup', data),
 });
 
 contextBridge.exposeInMainWorld('student', {
@@ -225,6 +248,12 @@ contextBridge.exposeInMainWorld('student', {
   generateQuestions: (data) => safeInvoke('student:generateQuestions', data),
   feynmanExplain: (data) => safeInvoke('student:feynmanExplain', data),
   activeRecall: (data) => safeInvoke('student:activeRecall', data),
+});
+
+contextBridge.exposeInMainWorld('settings', {
+  saveKey: (data) => safeInvoke('settings:save-key', data),
+  getKey: (data) => safeInvoke('settings:get-key', data),
+  getAllKeys: () => safeInvoke('settings:get-all-keys'),
 });
 
 contextBridge.exposeInMainWorld('plugins', {
@@ -237,6 +266,13 @@ contextBridge.exposeInMainWorld('plugins', {
   importFolder: (data) => safeInvoke('plugins:importFolder', data),
   getDir: () => safeInvoke('plugins:getDir'),
   createScaffold: (data) => safeInvoke('plugins:createScaffold', data),
+});
+
+contextBridge.exposeInMainWorld('security', {
+  getData: () => safeInvoke('security:getData'),
+  setStrictMode: (enabled) => safeInvoke('security:setStrictMode', enabled),
+  addWhitelistFolder: (folderPath) => safeInvoke('security:addWhitelistFolder', folderPath),
+  removeWhitelistFolder: (folderPath) => safeInvoke('security:removeWhitelistFolder', folderPath),
 });
 
 // ── Window Controls ───────────────────────────

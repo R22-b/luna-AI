@@ -1,14 +1,15 @@
 {
   "colors": {
-    "primary": "#7c3aed",
-    "bg": "#000000",
-    "surface": "#07070f",
-    "border": "#1a1a2e",
-    "accent": "#1e8fa0",
-    "textPrimary": "#c4c4d4",
-    "textMuted": "#4a4a6a"
+    "primary": "#1DB954",
+    "bg": "#121212",
+    "surface": "#1E1E1E",
+    "border": "#272727",
+    "accent": "#1DB954",
+    "textPrimary": "#FFFFFF",
+    "textMuted": "#B3B3B3"
   },
-  "fonts": { "size": "13px", "family": "Inter" },
   "radius": "12px",
-  "spacing": "comfortable"
+  "fonts": {
+    "size": "13px"
+  }
 }

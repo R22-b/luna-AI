@@ -73,7 +73,7 @@ async function runEvolutionCycle() {
   const analysis = analysePerformance();
   const loggedWeaknesses = analysis.weaknesses.slice(0, 3);
   for (const w of loggedWeaknesses) {
-    const prompt = `You are Luna's self-evolution engine. Weakness found: "${w}". Propose a fix for a specific file in the backend or src folder. Return ONLY valid JSON: {"file": "backend/luna-core.js", "description": "Improve X by doing Y", "code": "// full file code with fix applied", "risk": "low|medium|high"}`;
+    const prompt = `You are Luna's self-evolution engine. Weakness found: "${w}". Propose a fix for a specific file in the backend or src folder. Return ONLY valid JSON: {"file": "backend/luna-core.js", "description": "Improve X by doing Y", "code": "// full file code with fix applied", "test": "// test function to verify logic", "risk": "low|medium|high"}`;
     const res = await brain.smartCall([{role: 'user', content: prompt}], 'You are an expert JS dev. Return ONLY valid JSON.', 'code');
     
     try {
@@ -84,8 +84,8 @@ async function runEvolutionCycle() {
          continue; // Silently skip forbidden bounds
       }
       
-      db.prepare('INSERT INTO self_evolution_log (change_type, description, file_changed, proposed_code, risk_score, success) VALUES (?,?,?,?,?,?)')
-        .run('proposal', proposal.description, proposal.file, proposal.code, proposal.risk || 'low', 0);
+      db.prepare('INSERT INTO self_evolution_log (change_type, description, file_changed, proposed_code, proposed_test, risk_score, success) VALUES (?,?,?,?,?,?,?)')
+        .run('proposal', proposal.description, proposal.file, proposal.code, proposal.test || '', proposal.risk || 'low', 0);
     } catch(e) {
       db.prepare('INSERT INTO self_evolution_log (change_type, description, success) VALUES (?,?,?)').run('proposal', `Failed to generate parseable proposal for: ${w}`, -1);
     }
@@ -95,6 +95,7 @@ async function runEvolutionCycle() {
       .run('analysis', 'No actionable weaknesses found in current cycle', 1);
   }
 
+  console.log('Evolution cycle complete');
   return {
     success: true,
     analysis,
@@ -107,7 +108,7 @@ function applyProposal(logId) {
   if (!row || !row.proposed_code) return { success: false, error: 'Invalid proposal' };
   
   const sandbox = require('./evolution-sandbox');
-  const check = sandbox.testCode(row.proposed_code, row.file_changed);
+  const check = sandbox.testCode(row.proposed_code, row.proposed_test, row.file_changed);
   if (!check.passed) {
      db.prepare('UPDATE self_evolution_log SET success = -1 WHERE id = ?').run(logId);
      return { success: false, error: 'Sandbox verification failed: ' + check.errors.join(', ') };
