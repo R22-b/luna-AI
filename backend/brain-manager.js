@@ -7,6 +7,7 @@
 const axios = require('axios');
 const Store = require('electron-store');
 const store = new Store();
+const nvidiaCatalog = require('./nvidia-catalog');
 
 // ── Provider Configurations ───────────────────
 const PROVIDERS = {
@@ -193,6 +194,9 @@ const PROVIDERS = {
   },
 };
 
+// Merge NVIDIA models into PROVIDERS
+Object.assign(PROVIDERS, nvidiaCatalog.getProviders());
+
 // ── Response Cache (avoids duplicate API calls) ──
 const responseCache = new Map();
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
@@ -227,14 +231,14 @@ function setCachedResponse(key, response) {
 
 // ── Task Type → Provider Priority ─────────────
 const TASK_PRIORITIES = {
-  chat:      ['openrouter_llama_70b', 'groq', 'gemini', 'sambanova', 'openrouter_mistral', 'openrouter_gemini', 'nvidia_nim', 'openrouter_llama', 'cohere', 'cerebras', 'openrouter_gemma3', 'openrouter_liquid', 'nvidia_nim_nemotron', 'pollinations', 'together', 'openrouter'],
-  reasoning: ['openrouter_deepseek_r1', 'openrouter', 'gemini', 'nvidia_nim_nemotron', 'deepseek', 'sambanova', 'openrouter_qwen', 'cohere', 'groq', 'together_qwen', 'cerebras', 'nvidia_nim', 'pollinations'],
-  code:      ['openrouter_qwen', 'openrouter_llama_70b', 'openrouter', 'gemini', 'nvidia_nim', 'deepseek', 'sambanova', 'together_qwen', 'mistral', 'groq', 'cerebras', 'nvidia_nim_nemotron', 'pollinations', 'openrouter_gemini'],
-  summarize: ['openrouter_phi', 'gemini', 'openrouter_liquid', 'openrouter', 'sambanova', 'cohere', 'openrouter_gemini', 'openrouter_gemma3', 'cerebras', 'nvidia_nim', 'pollinations', 'groq', 'huggingface', 'openrouter_llama'],
-  creative:  ['openrouter_mistral', 'openrouter_liquid', 'gemini', 'openrouter', 'sambanova', 'together', 'huggingface_mistral', 'nvidia_nim_nemotron', 'pollinations', 'openrouter_qwen', 'openrouter_gemma3', 'cerebras', 'groq', 'together_qwen'],
-  research:  ['openrouter_llama_70b', 'openrouter_deepseek_r1', 'openrouter', 'gemini', 'sambanova', 'nvidia_nim', 'deepseek', 'cohere', 'openrouter_gemini', 'groq', 'cerebras', 'nvidia_nim_nemotron', 'pollinations', 'openrouter_llama'],
-  project_build: ['openrouter_qwen', 'openrouter_llama_70b', 'openrouter', 'gemini', 'nvidia_nim', 'sambanova', 'deepseek', 'together_qwen', 'mistral', 'groq', 'openrouter_gemini', 'nvidia_nim_nemotron', 'cohere', 'pollinations'],
-  plugin_build:  ['openrouter_qwen', 'openrouter', 'gemini', 'nvidia_nim', 'sambanova', 'deepseek', 'together_qwen', 'mistral', 'groq', 'openrouter_gemini', 'cohere', 'pollinations'],
+  chat:      ['nvidia_minimax_m27', 'nvidia_mistral_large3', 'nvidia_llama31_8b', 'nvidia_gemma2_2b', 'nvidia_minimax_m3', 'nvidia_mistral_small4', 'openrouter_llama_70b', 'groq', 'gemini', 'sambanova', 'openrouter_mistral', 'openrouter_gemini', 'nvidia_nim', 'openrouter_llama', 'cohere', 'cerebras', 'openrouter_gemma3', 'openrouter_liquid', 'nvidia_nim_nemotron', 'pollinations', 'together', 'openrouter'],
+  reasoning: ['nvidia_deepseek_r1', 'nvidia_nemotron_ultra', 'nvidia_llama33_70b', 'nvidia_glm5_2', 'nvidia_gpt_oss_120b', 'nvidia_gemma4_31b', 'openrouter_deepseek_r1', 'openrouter', 'gemini', 'nvidia_nim_nemotron', 'deepseek', 'sambanova', 'openrouter_qwen', 'cohere', 'groq', 'together_qwen', 'cerebras', 'nvidia_nim', 'pollinations'],
+  code:      ['nvidia_deepseek_v4_flash', 'nvidia_deepseek_v4_pro', 'nvidia_qwen25_coder', 'nvidia_kimi_k2', 'nvidia_glm5_1', 'openrouter_qwen', 'openrouter_llama_70b', 'openrouter', 'gemini', 'nvidia_nim', 'deepseek', 'sambanova', 'together_qwen', 'mistral', 'groq', 'cerebras', 'nvidia_nim_nemotron', 'pollinations', 'openrouter_gemini'],
+  summarize: ['nvidia_llama31_8b', 'nvidia_mistral_nemo', 'nvidia_gemma3n_e2b', 'nvidia_minimax_m27', 'openrouter_phi', 'gemini', 'openrouter_liquid', 'openrouter', 'sambanova', 'cohere', 'openrouter_gemini', 'openrouter_gemma3', 'cerebras', 'nvidia_nim', 'pollinations', 'groq', 'huggingface', 'openrouter_llama'],
+  creative:  ['nvidia_mistral_large3', 'nvidia_mixtral_8x7b', 'nvidia_dracarys', 'nvidia_minimax_m3', 'nvidia_mistral_medium', 'openrouter_mistral', 'openrouter_liquid', 'gemini', 'openrouter', 'sambanova', 'together', 'huggingface_mistral', 'nvidia_nim_nemotron', 'pollinations', 'openrouter_qwen', 'openrouter_gemma3', 'cerebras', 'groq', 'together_qwen'],
+  research:  ['nvidia_deepseek_r1', 'nvidia_llama33_70b', 'nvidia_glm5_2', 'nvidia_nemotron_ultra', 'openrouter_llama_70b', 'openrouter_deepseek_r1', 'openrouter', 'gemini', 'sambanova', 'nvidia_nim', 'deepseek', 'cohere', 'openrouter_gemini', 'groq', 'cerebras', 'nvidia_nim_nemotron', 'pollinations', 'openrouter_llama'],
+  project_build: ['nvidia_deepseek_v4_flash', 'nvidia_deepseek_v4_pro', 'nvidia_qwen25_coder', 'nvidia_kimi_k2', 'openrouter_qwen', 'openrouter_llama_70b', 'openrouter', 'gemini', 'nvidia_nim', 'sambanova', 'deepseek', 'together_qwen', 'mistral', 'groq', 'openrouter_gemini', 'nvidia_nim_nemotron', 'cohere', 'pollinations'],
+  plugin_build:  ['nvidia_deepseek_v4_flash', 'nvidia_deepseek_v4_pro', 'nvidia_qwen25_coder', 'nvidia_kimi_k2', 'openrouter_qwen', 'openrouter', 'gemini', 'nvidia_nim', 'sambanova', 'deepseek', 'together_qwen', 'mistral', 'groq', 'openrouter_gemini', 'cohere', 'pollinations'],
 };
 
 // ── State ─────────────────────────────────────
@@ -450,6 +454,9 @@ async function callProvider(providerName, messages, systemPrompt = '', maxTokens
 // ── Health Check ──────────────────────────────
 async function healthCheck() {
   console.log('🧠 Running AI provider health checks...');
+  let nvidiaChecked = false;
+  let nvidiaSuccess = false;
+  let nvidiaLatency = Infinity;
 
   const checks = Object.keys(PROVIDERS).map(async (name) => {
     const provider = PROVIDERS[name];
@@ -461,10 +468,26 @@ async function healthCheck() {
       providerLatencies[name] = Infinity;
       return;
     }
+    
+    // Group NVIDIA checks to save startup time
+    if (name.startsWith('nvidia_')) {
+      if (nvidiaChecked) {
+        providerHealth[name] = nvidiaSuccess;
+        providerLatencies[name] = nvidiaLatency;
+        return;
+      }
+      nvidiaChecked = true; // Claim the check
+    }
 
     const result = await callProvider(name, [{ role: 'user', content: 'Hi' }], '', 10);
+    
     providerHealth[name] = result.success;
     providerLatencies[name] = result.success ? result.latency : Infinity;
+    
+    if (name.startsWith('nvidia_')) {
+      nvidiaSuccess = result.success;
+      nvidiaLatency = providerLatencies[name];
+    }
 
     const status = result.success ? `✅ ${result.latency}ms` : `❌ ${result.error}`;
     console.log(`  ${provider.name}: ${status}`);
@@ -527,7 +550,31 @@ async function smartCall(messages, systemPrompt = '', taskType = 'chat') {
   }
 
   // Determine token limits based on task type
-  const maxTokens = (taskType === 'code' || taskType === 'project_build') ? 8000 : 1500;
+  let maxTokens = 8000;
+  if (taskType === 'code' || taskType === 'project_build') {
+    maxTokens = 32000;
+  } else if (taskType === 'reasoning') {
+    maxTokens = 16000;
+  }
+
+  // Manual Model Override
+  const manualModel = store.get('manual_model_override');
+  if (manualModel && manualModel !== 'auto' && PROVIDERS[manualModel]) {
+    // We attempt to use the manual model if it has a key (or doesn't need one)
+    const key = getKey(manualModel);
+    if (key || !PROVIDERS[manualModel].keyEnv) {
+      const result = await callProvider(manualModel, messages, systemPrompt, maxTokens);
+      if (result.success) {
+        return {
+          success: true,
+          content: result.content,
+          providerUsed: PROVIDERS[manualModel].name,
+          latency: result.latency,
+        };
+      }
+      console.log(`⚠️ Manual model ${manualModel} failed, falling back to auto-routing...`);
+    }
+  }
 
   // Try providers in priority order
   for (let attempt = 0; attempt < priorities.length; attempt++) {

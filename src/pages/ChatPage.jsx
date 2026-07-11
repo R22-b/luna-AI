@@ -13,6 +13,8 @@ export default function ChatPage() {
   const [activities, setActivities] = useState([]);
   const [talkMode, setTalkMode] = useState(false);
   const [lastLunaMsg, setLastLunaMsg] = useState('');
+  const [providers, setProviders] = useState([]);
+  const [selectedModel, setSelectedModel] = useState('auto');
   const scrollRef = useRef(null);
   const inputRef = useRef(null);
 
@@ -21,6 +23,7 @@ export default function ChatPage() {
     loadThreads();
     loadHistory(currentThreadId);
     loadProfile();
+    loadProviders();
   }, [currentThreadId]);
 
   // Auto-scroll to bottom
@@ -50,6 +53,21 @@ export default function ChatPage() {
       const res = await window.luna.getProfile();
       if (res?.profile?.nickname) setNickname(res.profile.nickname);
     } catch (err) { console.log('Using default nickname'); }
+  }
+
+  async function loadProviders() {
+    try {
+      const pRes = await window.luna.invoke('luna:getProviders');
+      if (pRes?.success) setProviders(pRes.providers);
+      const mRes = await window.luna.invoke('luna:getManualModel');
+      if (mRes?.success) setSelectedModel(mRes.model);
+    } catch (err) {}
+  }
+
+  async function handleModelChange(e) {
+    const val = e.target.value;
+    setSelectedModel(val);
+    await window.luna.invoke('luna:setManualModel', val);
   }
 
   async function loadThreads() {
@@ -316,6 +334,22 @@ export default function ChatPage() {
              <span className="text-[9px] text-luna-primary font-black uppercase tracking-tighter animate-pulse">Swarm Status: Active</span>
              <span className="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_5px_rgba(34,197,94,0.8)] animate-pulse" />
           </div>
+        </div>
+        </div>
+
+        {/* Manual Model Selector */}
+        <div className="flex items-center gap-2 px-6 py-2 border-t border-luna-border/20 bg-[#050a12]/80 text-[10px]">
+          <span className="text-luna-text-muted font-bold tracking-tight">BRAIN SELECTOR:</span>
+          <select 
+            value={selectedModel} 
+            onChange={handleModelChange}
+            className="bg-luna-surface border border-luna-border/50 text-luna-primary font-bold rounded p-1 outline-none focus:border-luna-primary"
+          >
+            <option value="auto">⚡ Luna Smart Auto-Routing (Best for Task)</option>
+            {providers.map(p => (
+              <option key={p.id} value={p.id}>{p.name}</option>
+            ))}
+          </select>
         </div>
 
         {/* Input Area */}

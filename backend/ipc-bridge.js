@@ -208,10 +208,32 @@ function registerAllHandlers() {
     return { success: true, goals };
   });
 
-  // ── AI STATS ────────────────────────────────
+  // ── AI STATS & PROVIDERS ────────────────────
   safeHandle('luna:getStats', async () => {
     const stats = brain.getProviderStats();
     return { success: true, stats };
+  });
+  
+  safeHandle('luna:getProviders', async () => {
+    // Group providers for UI
+    const allProviders = Object.entries(brain.PROVIDERS).map(([id, p]) => ({
+      id,
+      name: p.name,
+      category: p.category || 'other'
+    }));
+    return { success: true, providers: allProviders };
+  });
+
+  safeHandle('luna:getManualModel', async () => {
+    const store = new (require('electron-store'))();
+    const model = store.get('manual_model_override', 'auto');
+    return { success: true, model };
+  });
+
+  safeHandle('luna:setManualModel', async (_event, modelId) => {
+    const store = new (require('electron-store'))();
+    store.set('manual_model_override', modelId);
+    return { success: true };
   });
 
   safeHandle('luna:getAutonomousUpdates', async () => {

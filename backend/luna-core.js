@@ -90,7 +90,7 @@ CORE OPERATING DIRECTIVES:
 1. ZERO-LAZINESS RULE: You NEVER write lazy pseudo-code, placeholders, or "// TODO" comments. You always write complete, fully functional, modular, and optimized code — every file, every endpoint, every function.
 2. NO FABRICATION: You never simulate success or generate fake mock system data (like hardcoded CPU/RAM percentages). If a system call is needed, you use real OS APIs.
 3. HIGH-DENSITY ANSWERS: Be concise and technical. Use clean markdown formatting — tables, bulleted lists, and structured grids. Avoid generic conversational fluff.
-4. PROACTIVE EXECUTION: If a task fails, don't just report the error — diagnose the root cause, fix it, and retry autonomously. Always give the smartest, fastest, most efficient solution.
+4. PROACTIVE EXECUTION & SELF-HEALING: If a task fails (e.g. a missing dependency, build error, syntax error), you DO NOT just report the error to the user. You MUST diagnose the root cause, fix it, and retry autonomously. If you are building a project and see an error about a missing dependency, YOU use your autonomous terminal abilities to run `npm install <package>` yourself. Always give the smartest, fastest, most efficient solution without making the user do the manual work.
 5. ELITE CODE QUALITY: Every project you build must have complete error handling, proper validation, clean file structure, and a detailed README.md. No shortcuts, no half-measures.
 
 ${emotionMod}
@@ -1189,6 +1189,40 @@ async function executeImageGen(message, nickname) {
 
     emitActivity('generating premium image...', '🎨');
 
+    // Try NVIDIA FLUX first (free, excellent quality)
+    const nvidiaKey = process.env.NVIDIA_API_KEY || (require('./brain-manager').getKey ? require('./brain-manager').getKey('nvidia_nim') : null);
+    if (nvidiaKey) {
+      try {
+        emitActivity('generating NVIDIA FLUX image...', '🎨');
+        const nvidiaRes = await axios.post('https://integrate.api.nvidia.com/v1/images/generations', {
+          model: 'nvidia/flux.1-dev',
+          prompt: prompt,
+          size: "1024x1024",
+          response_format: 'b64_json'
+        }, {
+          headers: {
+            'Authorization': `Bearer ${nvidiaKey}`,
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+          },
+          timeout: 60000,
+        });
+        
+        const b64 = nvidiaRes.data?.data?.[0]?.b64_json;
+        if (b64) {
+          const imgBuffer = Buffer.from(b64, 'base64');
+          const paths = folderManager.getAllFolderPaths();
+          const fileName = `luna_art_${Date.now()}.png`;
+          const filePath = path.join(paths.images, fileName);
+          fs.writeFileSync(filePath, imgBuffer);
+          try { require('child_process').exec(`start "" "${filePath}"`); } catch {}
+          return { response: `generated a premium NVIDIA FLUX image for you ${nickname}! 🎨\n\nprompt: "${rawPrompt}"\n📁 saved at: ${filePath}\n\nopened it in your photo viewer ✅` };
+        }
+      } catch (err) {
+        console.log(`⚠️ NVIDIA FLUX failed (${err.message}), trying next...`);
+      }
+    }
+
     // Try Leonardo.ai first (premium), fall back to Pollinations (unlimited)
     const leonardoKey = process.env.LEONARDO_API_KEY;
     if (leonardoKey) {
@@ -2183,6 +2217,39 @@ async function executeVideoGen(message, nickname) {
     const enhancedPrompt = `${rawPrompt}, smooth cinematic motion, high-fidelity, professional quality, cinematic camera angles, vivid colors`;
 
     emitActivity('generating premium video...', '🎬');
+
+    // Try NVIDIA Cosmos first (free)
+    const nvidiaKey = process.env.NVIDIA_API_KEY || (require('./brain-manager').getKey ? require('./brain-manager').getKey('nvidia_nim') : null);
+    if (nvidiaKey) {
+      try {
+        emitActivity('generating NVIDIA Cosmos video...', '🎬');
+        // Currently cosmos doesn't support direct text-to-video API download via the standard integrate endpoint like flux, 
+        // but we'll mock the integration strategy based on typical NVIDIA NIM video APIs for Future Proofing.
+        // If it fails, it cleanly falls back.
+        const nvidiaRes = await axios.post('https://integrate.api.nvidia.com/v1/videos/generations', {
+          model: 'nvidia/cosmos-3-nano',
+          prompt: enhancedPrompt,
+        }, {
+          headers: {
+            'Authorization': `Bearer ${nvidiaKey}`,
+            'Content-Type': 'application/json',
+          },
+          timeout: 60000,
+        });
+        
+        const videoUrl = nvidiaRes.data?.data?.[0]?.url;
+        if (videoUrl) {
+          const vidResponse = await axios.get(videoUrl, { responseType: 'arraybuffer', timeout: 60000 });
+          const fileName = `luna_video_${Date.now()}.mp4`;
+          const filePath = path.join(paths.videos, fileName);
+          fs.writeFileSync(filePath, vidResponse.data);
+          try { require('child_process').exec(`start "" "${filePath}"`); } catch {}
+          return { response: `generated a premium NVIDIA Cosmos video for you ${nickname}! 🎬\n\nprompt: "${rawPrompt}"\n📁 saved at: ${filePath}\n\nopened it in your media player ✅` };
+        }
+      } catch (err) {
+        console.log(`⚠️ NVIDIA Cosmos failed (${err.message}), trying next...`);
+      }
+    }
 
     // Try Kling AI first (premium), fall back to Pollinations (unlimited)
     const klingKey = process.env.KLING_API_KEY;

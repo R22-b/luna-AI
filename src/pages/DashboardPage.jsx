@@ -8,14 +8,23 @@ export default function DashboardPage() {
   const [sysInfo, setSysInfo] = useState(null);
   const [weather, setWeather] = useState(null);
   const [news, setNews] = useState(null);
+  const [brainStats, setBrainStats] = useState(null);
 
   useEffect(() => {
     const timer = setInterval(() => setTime(new Date()), 1000);
     loadGoals();
     loadSystemInfo();
     loadWeatherAndNews();
+    loadBrainStats();
     return () => clearInterval(timer);
   }, []);
+
+  async function loadBrainStats() {
+    try {
+      const res = await window.luna?.invoke('luna:getStats');
+      if (res?.success) setBrainStats(res.stats);
+    } catch {}
+  }
 
   async function loadGoals() {
     const res = await window.luna?.getGoals();
@@ -83,14 +92,31 @@ export default function DashboardPage() {
           )}
         </div>
 
-        {/* AI Brains Card */}
-        <div className="bg-luna-surface border border-luna-border rounded-luna p-4">
-          <h3 className="text-xs text-luna-text-muted uppercase mb-3">🧠 AI Brains</h3>
-          <div className="space-y-1.5">
-            <div className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-green-500" /><span className="text-xs text-luna-text-primary">Pollinations</span><span className="text-[10px] text-green-400 ml-auto">active • free</span></div>
-            <div className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-gray-600" /><span className="text-xs text-luna-text-muted">Groq</span><a href="https://console.groq.com" target="_blank" className="text-[10px] text-luna-primary ml-auto hover:underline">get free key →</a></div>
-            <div className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-gray-600" /><span className="text-xs text-luna-text-muted">Gemini</span><a href="https://aistudio.google.com/apikey" target="_blank" className="text-[10px] text-luna-primary ml-auto hover:underline">get free key →</a></div>
-            <div className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-gray-600" /><span className="text-xs text-luna-text-muted">+5 more</span><span onClick={() => navigate('/settings')} className="text-[10px] text-luna-primary ml-auto cursor-pointer hover:underline">view all →</span></div>
+        {/* AI Brains Swatch Card */}
+        <div className="bg-luna-surface border border-luna-border rounded-luna p-4 flex flex-col">
+          <div className="flex justify-between items-center mb-3">
+            <h3 className="text-xs text-luna-text-muted uppercase">🧠 AI Brains (108 Models)</h3>
+            <span className="text-[10px] text-luna-primary">{brainStats?.providers?.filter(p => p.healthy)?.length || 0} Online</span>
+          </div>
+          
+          <div className="flex-1 overflow-y-auto custom-scrollbar pr-1" style={{ maxHeight: '100px' }}>
+            <div className="grid grid-cols-6 sm:grid-cols-8 md:grid-cols-10 gap-1.5">
+              {brainStats?.providers ? brainStats.providers.map((p) => {
+                let colorClass = 'bg-red-500/80 shadow-[0_0_5px_rgba(239,68,68,0.5)]'; // Offline
+                if (!p.hasKey && p.id !== 'pollinations') colorClass = 'bg-yellow-500/80 shadow-[0_0_5px_rgba(234,179,8,0.5)]'; // No Key
+                else if (p.healthy) colorClass = 'bg-green-500/80 shadow-[0_0_5px_rgba(34,197,94,0.5)]'; // Online
+
+                return (
+                  <div 
+                    key={p.id} 
+                    title={`${p.name}\nStatus: ${p.healthy ? 'Online' : (!p.hasKey ? 'Missing API Key' : 'Offline')}\nRequests: ${p.requests}`}
+                    className={`w-full aspect-square rounded-sm cursor-help transition-all hover:scale-110 ${colorClass}`} 
+                  />
+                );
+              }) : (
+                <div className="text-[10px] text-luna-text-muted col-span-full">Loading swatches...</div>
+              )}
+            </div>
           </div>
         </div>
       </div>
