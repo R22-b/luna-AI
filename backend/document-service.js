@@ -142,15 +142,18 @@ async function executeDocCreate(message, nickname) {
       const pdfDoc = await PDFDocument.create();
       const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
       const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+      const clean = (s) => (s||'').replace(/[\u2018\u2019]/g, "'").replace(/[\u201C\u201D]/g, '"').replace(/[\u2013\u2014]/g, '-').replace(/[^\x00-\x7F]/g, "");
+      
       let page = pdfDoc.addPage();
       let y = page.getHeight() - 60;
-      page.drawText(docData.title || 'Document', { x: 50, y, font: boldFont, size: 24 });
+      page.drawText(clean(docData.title) || 'Document', { x: 50, y, font: boldFont, size: 24 });
       y -= 40;
       for (const sec of (docData.sections || [])) {
         if (y < 80) { page = pdfDoc.addPage(); y = page.getHeight() - 60; }
-        if (sec.heading) { page.drawText(sec.heading, { x: 50, y, font: boldFont, size: 14 }); y -= 25; }
+        if (sec.heading) { page.drawText(clean(sec.heading), { x: 50, y, font: boldFont, size: 14 }); y -= 25; }
         if (sec.content) {
-          const lines = sec.content.match(/.{1,80}/g) || [sec.content];
+          const cleanContent = clean(sec.content);
+          const lines = cleanContent.match(/.{1,80}/g) || [cleanContent];
           for (const line of lines) {
             if (y < 50) { page = pdfDoc.addPage(); y = page.getHeight() - 60; }
             page.drawText(line, { x: 50, y, font, size: 11 }); y -= 16;

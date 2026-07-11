@@ -130,6 +130,7 @@ function runPowerShell(command) {
 
 const APP_MAP = {
   'notepad': 'notepad.exe',
+  'notpad': 'notepad.exe', // handle typo so it doesn't open notpad.com!
   'calculator': 'calc.exe',
   'calc': 'calc.exe',
   'paint': 'mspaint.exe',

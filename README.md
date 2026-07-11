@@ -19,6 +19,13 @@
 
 ---
 
+## 📢 Recent Updates
+
+- **UI Updates:** Added "Coming Soon" placeholder states for the **Student Superpower** and **Project Guardian** tabs.
+- **Bug Fixes:** Fixed PDF generation encoding issue (WinAnsi character crash due to smart quotes/em-dashes) and ensured `.env` variables load correctly without requiring a server restart.
+
+---
+
 ## 🎯 What is Luna AI?
 
 Luna is not just another chatbot. She's an **AGI-level desktop AI companion** that:

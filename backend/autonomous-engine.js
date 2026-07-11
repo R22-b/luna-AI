@@ -185,7 +185,7 @@ async function autonomousThinkCycle() {
     const lastResearch = memory.getMemory('last_autonomous_research');
     const oneDayAgo = Date.now() - (24 * 60 * 60 * 1000);
     if (!lastResearch || parseInt(lastResearch.value) < oneDayAgo) {
-      const interests = memory.searchMemories('interest').slice(0, 1);
+      const interests = (await memory.searchMemories('interest')).slice(0, 1);
       if (interests.length > 0) {
         try {
           const search = require('./search-engine');
@@ -240,9 +240,9 @@ function notifyFrontend(channel, data) {
   } catch {}
 }
 
-function getPendingInsights() {
-  const insights = memory.searchMemories('autonomous_insight');
-  const research = memory.searchMemories('autonomous_research');
+async function getPendingInsights() {
+  const insights = await memory.searchMemories('autonomous_insight');
+  const research = await memory.searchMemories('autonomous_research');
   return [...insights, ...research]
     .sort((a, b) => b.importance - a.importance)
     .slice(0, 5);

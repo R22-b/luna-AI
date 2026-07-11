@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 
 const PROVIDERS = [
+  { key: 'NVIDIA_API_KEY', name: 'NVIDIA NIM', desc: 'Access 81+ premium models', link: 'https://build.nvidia.com/', free: true },
   { key: 'GROQ_API_KEY', name: 'Groq', desc: 'Fastest inference', link: 'https://console.groq.com/keys', free: true },
   { key: 'GEMINI_API_KEY', name: 'Gemini', desc: 'Best reasoning', link: 'https://aistudio.google.com/apikey', free: true },
   { key: 'DEEPSEEK_API_KEY', name: 'DeepSeek', desc: 'Elite coding brain', link: 'https://platform.deepseek.com/api_keys', free: true },

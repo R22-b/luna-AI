@@ -167,7 +167,7 @@ function registerAllHandlers() {
   safeHandle('luna:searchMemories', async (_event, data) => {
     const { query } = data || {};
     if (!query) return { success: false, error: 'query required' };
-    const results = memory.searchMemories(query);
+    const results = await memory.searchMemories(query);
     return { success: true, results };
   });
 
@@ -239,7 +239,7 @@ function registerAllHandlers() {
   safeHandle('luna:getAutonomousUpdates', async () => {
     try {
       const autonomous = require('./autonomous-engine');
-      const updates = autonomous.getPendingInsights();
+      const updates = await autonomous.getPendingInsights();
       autonomous.clearInsights();
       return { success: true, updates };
     } catch {

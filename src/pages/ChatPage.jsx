@@ -335,7 +335,6 @@ export default function ChatPage() {
              <span className="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_5px_rgba(34,197,94,0.8)] animate-pulse" />
           </div>
         </div>
-        </div>
 
         {/* Manual Model Selector */}
         <div className="flex items-center gap-2 px-6 py-2 border-t border-luna-border/20 bg-[#050a12]/80 text-[10px]">
