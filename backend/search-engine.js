@@ -6,6 +6,31 @@
 
 const axios = require('axios');
 const brain = require('./brain-manager');
+const Store = require('electron-store');
+const store = new Store();
+
+// ── Centralized API Key Access ────────────────
+// Uses electron-store first (user-configured via Settings UI),
+// then falls back to process.env for .env file keys
+function getSearchKey(envName) {
+  return store.get(envName) || process.env[envName] || null;
+}
+
+// ── Content Sanitization ──────────────────────
+// Strip dangerous tags from scraped content before processing
+function sanitizeContent(text) {
+  if (!text) return '';
+  return text
+    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+    .replace(/<iframe[^>]*>[\s\S]*?<\/iframe>/gi, '')
+    .replace(/<object[^>]*>[\s\S]*?<\/object>/gi, '')
+    .replace(/<embed[^>]*>[\s\S]*?<\/embed>/gi, '')
+    .replace(/<form[^>]*>[\s\S]*?<\/form>/gi, '')
+    .replace(/on\w+="[^"]*"/gi, '')
+    .replace(/on\w+='[^']*'/gi, '')
+    .replace(/javascript:/gi, '')
+    .trim();
+}
 
 // ══════════════════════════════════════════════
 // SEARCH
@@ -15,8 +40,8 @@ const brain = require('./brain-manager');
  * Search the web using Serper (primary) or Brave Search (fallback)
  */
 async function search(query, numResults = 5) {
-  // Try Serper first
-  const serperKey = process.env.SERPER_API_KEY;
+  // Try Serper first — using centralized key management
+  const serperKey = getSearchKey('SERPER_API_KEY');
   if (serperKey) {
     try {
       const res = await axios.post('https://google.serper.dev/search', {
@@ -46,8 +71,8 @@ async function search(query, numResults = 5) {
     }
   }
 
-  // Fallback: Brave Search
-  const braveKey = process.env.BRAVE_SEARCH_KEY;
+  // Fallback: Brave Search — using centralized key management
+  const braveKey = getSearchKey('BRAVE_SEARCH_KEY');
   if (braveKey) {
     try {
       const res = await axios.get('https://api.search.brave.com/res/v1/web/search', {
@@ -111,6 +136,16 @@ async function searchAndSummarize(query, aiSystemPrompt = '') {
 
   const result = await brain.smartCall(messages, systemPrompt, 'research');
 
+  // Validate AI call actually succeeded before reporting success
+  if (!result.success) {
+    return {
+      success: false,
+      answer: result.content || "AI summarization failed — search results were found but couldn't be synthesized 😅",
+      sources: [],
+      provider: searchResults.provider,
+    };
+  }
+
   const sources = searchResults.results.map(r => ({
     title: r.title,
     url: r.url,
@@ -159,6 +194,9 @@ async function fetchPageContent(url) {
       .replace(/\s+/g, ' ')                                   // Collapse whitespace
       .trim();
 
+    // Sanitize the extracted text
+    text = sanitizeContent(text);
+
     // Extract title
     const titleMatch = html.match(/<title[^>]*>(.*?)<\/title>/i);
     const title = titleMatch ? titleMatch[1].trim() : url;
@@ -178,6 +216,7 @@ async function fetchPageContent(url) {
 /**
  * Fetch webpage content using a hidden Electron background window.
  * This runs JS, renders client-side webapps, and bypasses standard bot-blockers.
+ * Security: webSecurity is ENABLED — we sanitize output instead.
  */
 async function fetchPageContentElectron(url) {
   try {
@@ -188,7 +227,7 @@ async function fetchPageContentElectron(url) {
         webPreferences: {
           nodeIntegration: false,
           contextIsolation: true,
-          webSecurity: false
+          webSecurity: true  // SECURITY FIX: was false, now properly enabled
         }
       });
 
@@ -215,7 +254,7 @@ async function fetchPageContentElectron(url) {
           try { win.destroy(); } catch {}
           win = null;
 
-          let cleanedText = (text || '').replace(/\s+/g, ' ').trim();
+          let cleanedText = sanitizeContent((text || '').replace(/\s+/g, ' ').trim());
           if (cleanedText.length > 8000) {
             cleanedText = cleanedText.substring(0, 8000) + '... [truncated]';
           }
@@ -311,6 +350,17 @@ Content: ${page.content}`,
   const systemPrompt = 'You are Luna. Summarize web content clearly and concisely. Use your Gen-Z personality. Format with clear sections.';
 
   const result = await brain.smartCall(messages, systemPrompt, 'summarize');
+
+  // Validate AI call actually succeeded before reporting success
+  if (!result.success) {
+    return {
+      success: false,
+      summary: result.content || `fetched the page but AI summarization failed 😅`,
+      keyPoints: [],
+      title: page.title,
+      url,
+    };
+  }
 
   return {
     success: true,

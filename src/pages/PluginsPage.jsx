@@ -161,8 +161,8 @@ export default function PluginsPage() {
         {[
           { name: 'weather-widget', desc: 'Live weather updates on dashboard', icon: '🌤️', status: 'install' },
           { name: 'auto-logger', desc: 'Background conversation logger', icon: '📝', status: 'install' },
-          { name: 'spotify-controller', desc: 'Play/pause/skip from Luna', icon: '🎵', status: 'coming soon' },
-          { name: 'email-assistant', desc: 'Draft and send emails via Luna', icon: '📧', status: 'coming soon' },
+          { name: 'spotify-controller', desc: 'Play/pause/skip from Luna', icon: '🎵', status: 'install' },
+          { name: 'email-assistant', desc: 'Draft and send emails via Luna', icon: '📧', status: 'install' },
         ].map((plugin, i) => (
           <div key={i} className="bg-luna-surface border border-luna-border rounded-luna p-4 hover:border-luna-primary/30 transition-colors">
             <div className="flex items-center gap-2 mb-2">

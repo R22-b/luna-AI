@@ -5,6 +5,7 @@ const fs = require('fs');
 const os = require('os');
 
 let isSpeaking = false;
+let activeProcess = null;  // Track active TTS process for proper stop
 
 async function speak(text) {
   if (!text || isSpeaking) return;
@@ -18,34 +19,63 @@ async function speak(text) {
     // Attempt high-quality edge-tts (optional enhancement)
     await new Promise((resolve, reject) => {
       const edgeTts = spawn('npx', ['edge-tts', '--voice', 'en-US-AriaNeural', '--text', text, '--write-media', tmpFile], { shell: true, timeout: 8000 });
-      edgeTts.on('close', (code) => code === 0 ? resolve() : reject(new Error(`exit ${code}`)));
-      edgeTts.on('error', reject);
+      activeProcess = edgeTts;  // Track for stopSpeaking()
+      edgeTts.on('close', (code) => {
+        activeProcess = null;
+        code === 0 ? resolve() : reject(new Error(`exit ${code}`));
+      });
+      edgeTts.on('error', (err) => {
+        activeProcess = null;
+        reject(err);
+      });
     });
     
+    if (!isSpeaking) {
+      // User called stopSpeaking() while generating audio
+      try { fs.unlinkSync(tmpFile); } catch {}
+      return;
+    }
+
     if (fs.existsSync(tmpFile)) {
       await new Promise((resolve) => {
         const player = spawn('powershell.exe', ['-NoProfile', '-Command',
           `$p = New-Object System.Media.SoundPlayer("${tmpFile}"); $p.PlaySync()`], { shell: false });
-        player.on('close', resolve);
-        player.on('error', resolve);
+        activeProcess = player;  // Track for stopSpeaking()
+        player.on('close', () => {
+          activeProcess = null;
+          resolve();
+        });
+        player.on('error', () => {
+          activeProcess = null;
+          resolve();
+        });
       });
       edgeTtsSuccess = true;
       try { fs.unlinkSync(tmpFile); } catch {}
     }
   } catch (err) {
+    activeProcess = null;
     // Silently catch npx/edge-tts failures. It's an optional enhancement.
   }
 
   // Fallback to built-in Windows TTS (guaranteed to exist)
-  if (!edgeTtsSuccess) {
+  if (!edgeTtsSuccess && isSpeaking) {
     try {
       await new Promise((resolve) => {
         const psCmd = `Add-Type -AssemblyName System.Speech; $synth = New-Object System.Speech.Synthesis.SpeechSynthesizer; $synth.Speak("${cleanText}")`;
         const player = spawn('powershell.exe', ['-NoProfile', '-Command', psCmd], { shell: false });
-        player.on('close', resolve);
-        player.on('error', resolve);
+        activeProcess = player;  // Track for stopSpeaking()
+        player.on('close', () => {
+          activeProcess = null;
+          resolve();
+        });
+        player.on('error', () => {
+          activeProcess = null;
+          resolve();
+        });
       });
     } catch (fallbackErr) {
+      activeProcess = null;
       // Only log if the ultimate fallback fails
       console.error('[Voice] Critical TTS failure:', fallbackErr.message);
     }
@@ -54,6 +84,17 @@ async function speak(text) {
   isSpeaking = false;
 }
 
-function stopSpeaking() { isSpeaking = false; }
+function stopSpeaking() {
+  isSpeaking = false;
+  // FIXED: Actually kill the running TTS process instead of just flipping a flag
+  if (activeProcess) {
+    try {
+      activeProcess.kill('SIGTERM');
+    } catch {
+      try { activeProcess.kill(); } catch {}
+    }
+    activeProcess = null;
+  }
+}
 
 module.exports = { speak, stopSpeaking, get isSpeaking() { return isSpeaking; } };

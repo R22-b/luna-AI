@@ -8,6 +8,7 @@ const axios = require('axios');
 const Store = require('electron-store');
 const store = new Store();
 const nvidiaCatalog = require('./nvidia-catalog');
+const brainSwarm = require('./brain-swarm');
 
 // ── Provider Configurations ───────────────────
 const PROVIDERS = {
@@ -217,12 +218,8 @@ function getCachedResponse(key) {
 }
 
 function setCachedResponse(key, response) {
-  // Keep cache small — max 100 entries
+  // Keep cache small — max 100 entries (fixed: was duplicate threshold)
   if (responseCache.size > 100) {
-    const firstKey = responseCache.keys().next().value;
-    responseCache.delete(firstKey);
-  }
-  if (responseCache.size > 500) {
     const firstKey = responseCache.keys().next().value;
     responseCache.delete(firstKey);
   }
@@ -230,27 +227,20 @@ function setCachedResponse(key, response) {
 }
 
 // ── Task Type → Provider Priority ─────────────
-const TASK_PRIORITIES = {
-  chat:      ['nvidia_minimax_m27', 'nvidia_mistral_large3', 'nvidia_llama31_8b', 'nvidia_gemma2_2b', 'nvidia_minimax_m3', 'nvidia_mistral_small4', 'openrouter_llama_70b', 'groq', 'gemini', 'sambanova', 'openrouter_mistral', 'openrouter_gemini', 'nvidia_nim', 'openrouter_llama', 'cohere', 'cerebras', 'openrouter_gemma3', 'openrouter_liquid', 'nvidia_nim_nemotron', 'pollinations', 'together', 'openrouter'],
-  reasoning: ['nvidia_deepseek_r1', 'nvidia_nemotron_ultra', 'nvidia_llama33_70b', 'nvidia_glm5_2', 'nvidia_gpt_oss_120b', 'nvidia_gemma4_31b', 'openrouter_deepseek_r1', 'openrouter', 'gemini', 'nvidia_nim_nemotron', 'deepseek', 'sambanova', 'openrouter_qwen', 'cohere', 'groq', 'together_qwen', 'cerebras', 'nvidia_nim', 'pollinations'],
-  code:      ['nvidia_deepseek_v4_flash', 'nvidia_deepseek_v4_pro', 'nvidia_qwen25_coder', 'nvidia_kimi_k2', 'nvidia_glm5_1', 'openrouter_qwen', 'openrouter_llama_70b', 'openrouter', 'gemini', 'nvidia_nim', 'deepseek', 'sambanova', 'together_qwen', 'mistral', 'groq', 'cerebras', 'nvidia_nim_nemotron', 'pollinations', 'openrouter_gemini'],
-  summarize: ['nvidia_llama31_8b', 'nvidia_mistral_nemo', 'nvidia_gemma3n_e2b', 'nvidia_minimax_m27', 'openrouter_phi', 'gemini', 'openrouter_liquid', 'openrouter', 'sambanova', 'cohere', 'openrouter_gemini', 'openrouter_gemma3', 'cerebras', 'nvidia_nim', 'pollinations', 'groq', 'huggingface', 'openrouter_llama'],
-  creative:  ['nvidia_mistral_large3', 'nvidia_mixtral_8x7b', 'nvidia_dracarys', 'nvidia_minimax_m3', 'nvidia_mistral_medium', 'openrouter_mistral', 'openrouter_liquid', 'gemini', 'openrouter', 'sambanova', 'together', 'huggingface_mistral', 'nvidia_nim_nemotron', 'pollinations', 'openrouter_qwen', 'openrouter_gemma3', 'cerebras', 'groq', 'together_qwen'],
-  research:  ['nvidia_deepseek_r1', 'nvidia_llama33_70b', 'nvidia_glm5_2', 'nvidia_nemotron_ultra', 'openrouter_llama_70b', 'openrouter_deepseek_r1', 'openrouter', 'gemini', 'sambanova', 'nvidia_nim', 'deepseek', 'cohere', 'openrouter_gemini', 'groq', 'cerebras', 'nvidia_nim_nemotron', 'pollinations', 'openrouter_llama'],
-  project_build: ['nvidia_deepseek_v4_flash', 'nvidia_deepseek_v4_pro', 'nvidia_qwen25_coder', 'nvidia_kimi_k2', 'openrouter_qwen', 'openrouter_llama_70b', 'openrouter', 'gemini', 'nvidia_nim', 'sambanova', 'deepseek', 'together_qwen', 'mistral', 'groq', 'openrouter_gemini', 'nvidia_nim_nemotron', 'cohere', 'pollinations'],
-  plugin_build:  ['nvidia_deepseek_v4_flash', 'nvidia_deepseek_v4_pro', 'nvidia_qwen25_coder', 'nvidia_kimi_k2', 'openrouter_qwen', 'openrouter', 'gemini', 'nvidia_nim', 'sambanova', 'deepseek', 'together_qwen', 'mistral', 'groq', 'openrouter_gemini', 'cohere', 'pollinations'],
-};
+// Routing is now handled by the Brain Swarm architecture (brain-swarm.js)
 
 // ── State ─────────────────────────────────────
 const providerHealth = {};
 const providerLatencies = {};
 const requestCounts = {};
+const tokenUsage = {};  // Track tokens per provider
 
 // Initialize state
 for (const key of Object.keys(PROVIDERS)) {
   providerHealth[key] = false; // Unknown until health check
   providerLatencies[key] = Infinity;
   requestCounts[key] = 0;
+  tokenUsage[key] = { input: 0, output: 0, total: 0 };
 }
 
 // ── Get API Key ───────────────────────────────
@@ -275,6 +265,7 @@ async function callProvider(providerName, messages, systemPrompt = '', maxTokens
 
   try {
     let content = '';
+    let lastResponse = null;  // Hoisted for token tracking across all formats
 
     switch (provider.format) {
       case 'openai': {
@@ -294,6 +285,7 @@ async function callProvider(providerName, messages, systemPrompt = '', maxTokens
           },
           timeout: 30000,
         });
+        lastResponse = res;
         content = res.data.choices[0].message.content;
         break;
       }
@@ -315,6 +307,7 @@ async function callProvider(providerName, messages, systemPrompt = '', maxTokens
           headers: { 'Content-Type': 'application/json' },
           timeout: 30000,
         });
+        lastResponse = res;
         content = res.data.choices[0].message.content;
         
         // Remove Pollinations text ads
@@ -364,6 +357,7 @@ async function callProvider(providerName, messages, systemPrompt = '', maxTokens
           headers: { 'Content-Type': 'application/json' },
           timeout: 30000,
         });
+        lastResponse = res;
         content = res.data.candidates[0].content.parts[0].text;
         break;
       }
@@ -398,6 +392,7 @@ async function callProvider(providerName, messages, systemPrompt = '', maxTokens
           },
           timeout: 30000,
         });
+        lastResponse = res;
         content = res.data.text;
         break;
       }
@@ -423,6 +418,7 @@ async function callProvider(providerName, messages, systemPrompt = '', maxTokens
           },
           timeout: 30000,
         });
+        lastResponse = res;
         content = Array.isArray(res.data) ? res.data[0].generated_text : res.data.generated_text;
         break;
       }
@@ -435,6 +431,23 @@ async function callProvider(providerName, messages, systemPrompt = '', maxTokens
     requestCounts[providerName] = (requestCounts[providerName] || 0) + 1;
     providerHealth[providerName] = true;
     providerLatencies[providerName] = latency;
+
+    // Track token usage from API response (OpenAI-format providers return usage)
+    try {
+      if (lastResponse && lastResponse.data && lastResponse.data.usage) {
+        const u = lastResponse.data.usage;
+        if (!tokenUsage[providerName]) tokenUsage[providerName] = { input: 0, output: 0, total: 0 };
+        tokenUsage[providerName].input += (u.prompt_tokens || 0);
+        tokenUsage[providerName].output += (u.completion_tokens || 0);
+        tokenUsage[providerName].total += (u.total_tokens || (u.prompt_tokens || 0) + (u.completion_tokens || 0));
+      } else {
+        // Estimate tokens for providers that don't return usage (~4 chars per token)
+        const estimatedTokens = Math.ceil((content || '').length / 4);
+        if (!tokenUsage[providerName]) tokenUsage[providerName] = { input: 0, output: 0, total: 0 };
+        tokenUsage[providerName].output += estimatedTokens;
+        tokenUsage[providerName].total += estimatedTokens;
+      }
+    } catch { /* token tracking is best-effort */ }
 
     return { success: true, content, latency, error: null };
 
@@ -506,8 +519,8 @@ function startHealthChecks() {
   // Run immediately
   healthCheck();
 
-  // Then every 3 minutes
-  // healthInterval = setInterval(healthCheck, 3 * 60 * 1000); // KILLED FOR v2.0
+  // Then every 5 minutes (re-enabled for v2.1 — providers need periodic re-evaluation)
+  healthInterval = setInterval(healthCheck, 5 * 60 * 1000);
 }
 
 function stopHealthChecks() {
@@ -519,7 +532,7 @@ function stopHealthChecks() {
 
 // ── Get Best Provider for Task Type ───────────
 function getBestProvider(taskType = 'chat') {
-  const priorities = TASK_PRIORITIES[taskType] || TASK_PRIORITIES.chat;
+  const priorities = brainSwarm.routeToSquad(taskType);
 
   // Return first healthy provider in priority list
   for (const name of priorities) {
@@ -539,7 +552,7 @@ function getBestProvider(taskType = 'chat') {
 
 // ── Smart Call (with auto-fallback) ───────────
 async function smartCall(messages, systemPrompt = '', taskType = 'chat') {
-  const priorities = TASK_PRIORITIES[taskType] || TASK_PRIORITIES.chat;
+  const priorities = brainSwarm.routeToSquad(taskType);
   const tried = [];
 
   // Check cache first (skip for code/project tasks which should always be fresh)
@@ -557,13 +570,16 @@ async function smartCall(messages, systemPrompt = '', taskType = 'chat') {
     maxTokens = 16000;
   }
 
+  // Optimize context (ensure < 4K tokens) before sending to API
+  const optimizedMessages = brainSwarm.pruneContext(messages, Math.min(maxTokens, 4000));
+
   // Manual Model Override
   const manualModel = store.get('manual_model_override');
   if (manualModel && manualModel !== 'auto' && PROVIDERS[manualModel]) {
     // We attempt to use the manual model if it has a key (or doesn't need one)
     const key = getKey(manualModel);
     if (key || !PROVIDERS[manualModel].keyEnv) {
-      const result = await callProvider(manualModel, messages, systemPrompt, maxTokens);
+      const result = await callProvider(manualModel, optimizedMessages, systemPrompt, maxTokens);
       if (result.success) {
         return {
           success: true,
@@ -643,6 +659,7 @@ function getProviderStats() {
     providerHealth: { ...providerHealth },
     providerLatencies: { ...providerLatencies },
     requestCounts: { ...requestCounts },
+    tokenUsage: { ...tokenUsage },
     providers: Object.entries(PROVIDERS).map(([key, p]) => ({
       id: key,
       name: p.name,
@@ -650,8 +667,21 @@ function getProviderStats() {
       healthy: providerHealth[key],
       latency: providerLatencies[key],
       requests: requestCounts[key] || 0,
+      tokens: tokenUsage[key] || { input: 0, output: 0, total: 0 },
       hasKey: p.keyEnv ? !!getKey(key) : true,
     })),
+  };
+}
+
+// ── Get Token Usage Summary ───────────────────
+function getTokenUsage() {
+  let totalTokens = 0;
+  for (const key of Object.keys(tokenUsage)) {
+    totalTokens += (tokenUsage[key]?.total || 0);
+  }
+  return {
+    perProvider: { ...tokenUsage },
+    totalTokensThisSession: totalTokens,
   };
 }
 
@@ -664,5 +694,7 @@ module.exports = {
   startHealthChecks,
   stopHealthChecks,
   getProviderStats,
+  getTokenUsage,
+  getKey,
   PROVIDERS,
 };
