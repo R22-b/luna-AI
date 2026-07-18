@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 export default function PluginsPage() {
   const [installed, setInstalled] = useState([]);
@@ -9,31 +9,28 @@ export default function PluginsPage() {
   }, []);
 
   async function loadInstalled() {
-    setLoading(true);
     try {
       const res = await window.plugins?.getInstalled();
-      if (res?.success) {
-        setInstalled(res.plugins || []);
-      }
-    } finally {
-      setLoading(false);
+      if (res) setInstalled(res);
+    } catch (err) {
+      console.error('Failed to load plugins:', err);
     }
   }
 
   async function reloadPlugins() {
     setLoading(true);
     try {
-      await window.plugins?.reload();
+      await window.plugins?.loadAll();
       await loadInstalled();
     } finally {
       setLoading(false);
     }
   }
 
-  async function togglePlugin(name, isEnabled) {
+  async function togglePlugin(name, currentEnabled) {
     setLoading(true);
     try {
-      if (isEnabled) {
+      if (currentEnabled) {
         await window.plugins?.unload({ name });
       } else {
         await window.plugins?.enable({ name });
@@ -75,11 +72,16 @@ export default function PluginsPage() {
     }
   }
 
-  async function createScaffold() {
-    const name = `my-plugin-${Math.floor(Math.random() * 10000)}`;
+  async function createScaffold(name = "", desc = "") {
+    let pluginName = typeof name === "string" && name ? name : await window.electron.ipcRenderer.invoke("luna:prompt", { title: "Plugin Name", label: "What should we call this plugin?" });
+    if (!pluginName) return;
+    
     setLoading(true);
     try {
-      const res = await window.plugins?.createScaffold({ name });
+      const res = await window.plugins?.createScaffold({ 
+        name: pluginName, 
+        description: typeof desc === "string" ? desc : "" 
+      });
       if (res?.success) {
         alert(`Plugin scaffold created at:\n${res.pluginPath}`);
         await reloadPlugins();
@@ -97,7 +99,7 @@ export default function PluginsPage() {
     <div className="h-full overflow-y-auto bg-black px-8 py-6">
       <h1 className="text-xl font-semibold text-luna-text-primary mb-2">Plugin Store 🔌</h1>
       <p className="text-sm text-luna-text-muted mb-4">import plugin folders from your PC — Luna manages them in your Workspace</p>
-
+      
       <div className="flex items-center gap-3 mb-6">
         <button
           onClick={importPlugin}
@@ -107,7 +109,7 @@ export default function PluginsPage() {
           {loading ? 'Importing...' : 'Import Plugin Folder'}
         </button>
         <button
-          onClick={createScaffold}
+          onClick={() => createScaffold()}
           disabled={loading}
           className="px-4 py-2 bg-luna-surface text-luna-text-primary text-xs rounded-luna hover:bg-luna-surface/80 border border-luna-border disabled:opacity-40"
         >
@@ -171,7 +173,12 @@ export default function PluginsPage() {
             </div>
             <p className="text-xs text-luna-text-muted mb-3">{plugin.desc}</p>
             {plugin.status === 'install' ? (
-              <button className="text-[10px] bg-luna-primary text-white px-3 py-1 rounded hover:bg-luna-primary/80">Install</button>
+              <button 
+                onClick={() => createScaffold(plugin.name, plugin.desc)}
+                className="text-[10px] bg-luna-primary text-white px-3 py-1 rounded hover:bg-luna-primary/80"
+              >
+                Install
+              </button>
             ) : (
               <span className="text-[10px] bg-luna-bg text-luna-text-muted px-2 py-0.5 rounded-full">{plugin.status}</span>
             )}

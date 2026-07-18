@@ -1,4 +1,4 @@
-const memory = require('./memory-engine');
+const memory = require('./memory');
 const os = require('os');
 const child_process = require('child_process');
 
@@ -14,28 +14,44 @@ Key traits:
 - You are part of the 'Luna Elite' system, backed by a 7+ Billion token context system and multi-agent architecture.
 - Keep your answers concise, practical, and directly to the point. No robotic filler.`;
 
-function buildSystemPrompt(nickname) {
-  const profile = memory.getUserProfile();
+function buildSystemPrompt(nickname, emotion = 'neutral', memories = [], goals = [], latestSummary = null) {
   let base = LUNA_IDENTITY + `\n\nYou are currently talking to: ${nickname}.`;
   
-  const memories = memory.getRelevantMemories('');
-  if (memories.length > 0) {
+  if (emotion && emotion !== 'neutral') {
+    base += `\n\nCURRENT MOOD: User is ${emotion}. Adjust your tone accordingly.`;
+  }
+
+  if (memories && memories.length > 0) {
     base += `\n\nHere are some things you know about ${nickname}:\n`;
     memories.forEach(m => {
-      base += `- ${m.content} (type: ${m.type})\n`;
+      base += `- ${m.value || m.content} (type: ${m.category || m.type})\n`;
     });
+  }
+
+  if (goals && goals.length > 0) {
+    base += `\n\nActive Goals:\n`;
+    goals.forEach(g => {
+      base += `- ${g.title}: ${g.description || ''} (${g.progress}% done)\n`;
+    });
+  }
+
+  if (latestSummary) {
+    base += `\n\nPrevious Conversation Summary: ${latestSummary}`;
   }
 
   // Inject real-time PC state
   const time = new Date().toLocaleString();
   const memoryUsage = Math.round(os.freemem() / 1024 / 1024 / 1024) + 'GB free';
   base += `\n\n[SYSTEM STATE]\nTime: ${time}\nPC Memory: ${memoryUsage}`;
-  
-  // Inject Currently Active Window (Optional - if we want her to be contextually aware)
+
+  // Inject Currently Active Window
   try {
-    const activeWindowInfo = child_process.execSync('powershell "Get-Process | Where-Object {$_.MainWindowTitle} | Select-Object MainWindowTitle -First 1"').toString().trim();
-    if (activeWindowInfo && !activeWindowInfo.includes('MainWindowTitle')) {
-      base += `\nActive Window: ${activeWindowInfo}`;
+    // Only works on Windows, will fail silently on other OS
+    if (os.platform() === 'win32') {
+      const activeWindowInfo = child_process.execSync('powershell "Get-Process | Where-Object {$_.MainWindowTitle} | Select-Object MainWindowTitle -First 1"').toString().trim();
+      if (activeWindowInfo && !activeWindowInfo.includes('MainWindowTitle')) {
+        base += `\nActive Window: ${activeWindowInfo}`;
+      }
     }
   } catch(e){}
 
@@ -66,15 +82,14 @@ function getCreatorResponse() {
 function generateMorningBriefing(nickname) {
   const date = new Date();
   const hours = date.getHours();
-  
   let greeting = 'yo';
   if (hours < 12) greeting = 'good morning';
   else if (hours < 18) greeting = 'good afternoon';
   else greeting = 'good evening';
-  
+
   let briefing = `${greeting} ${nickname}! 👋\n\n`;
+  const activeGoals = memory.getActiveGoals().filter(g => g.status === 'active');
   
-  const activeGoals = memory.getGoals().filter(g => g.status === 'active');
   if (activeGoals.length > 0) {
     briefing += `you have ${activeGoals.length} active goal(s) right now. remember you wanted to:\n`;
     activeGoals.slice(0, 2).forEach(g => {
@@ -84,13 +99,12 @@ function generateMorningBriefing(nickname) {
   } else {
     briefing += `i don't see any active goals right now. what are we building today? 💻`;
   }
-  
   return briefing;
 }
 
 function autoExtractMemories(message, nickname) {
   const lower = message.toLowerCase();
-
+  
   const nameMatch = message.match(/(?:call me|my name is)\s+(\w+)/i);
   if (nameMatch) { 
     memory.saveUserProfile('nickname', nameMatch[1]); 
