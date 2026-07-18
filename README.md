@@ -15,7 +15,7 @@
 
 <br />
 
-> **Luna AI is completely free, open-source, and works with 27+ AI providers. No credit card needed. No subscriptions. Ever.**
+> **Luna AI is completely free, open-source, and works with 108+ AI models across 27+ providers. No credit card needed. No subscriptions. Ever.**
 
 ---
 
@@ -38,7 +38,7 @@ Luna is not just another chatbot. She's an **AGI-level desktop AI companion** th
 - **Remembers everything** — learns your preferences, habits, and goals
 - **Self-evolves** — analyzes her own performance and improves autonomously
 - **Works offline** — has fallback capabilities when internet is down
-- **Completely free** — uses 27+ free AI providers with ~7.7 Billion tokens/month
+- **Completely free** — uses 108+ AI models across 27+ free providers with ~7.7 Billion tokens/month
 
 **Built by Ravikiran, a final-year BCA student from Bengaluru, India.**
 
@@ -48,7 +48,7 @@ Luna is not just another chatbot. She's an **AGI-level desktop AI companion** th
 
 ### 🧠 27-Brain AI Cascade System
 
-Luna doesn't rely on a single AI provider. She orchestrates **27 different AI models** simultaneously:
+Luna doesn't rely on a single AI provider. She orchestrates **108+ different AI models** simultaneously across 27+ providers:
 
 - **Elite 5 (Always Free):** Groq, Gemini Pro, Cerebras, SambaNova, Pollinations
 - **Premium Tier:** Claude 3.7, GPT-4, DeepSeek, Mistral Large (user-provided keys)
@@ -61,7 +61,7 @@ Luna doesn't rely on a single AI provider. She orchestrates **27 different AI mo
 4. For complex tasks, a "Master AI" synthesizes the best responses
 5. You get the **best possible answer** in ~2-7 seconds
 
-**Result:** ~1 Billion free API tokens/month, completely free.
+**Result:** ~7.7 Billion free API tokens/month, completely free.
 
 ---
 
@@ -272,7 +272,7 @@ Luna works **completely free out of the box** using Pollinations. But for better
 | **Memory Usage (Idle)** | ~210 MB |
 | **Memory Usage (Peak)** | ~350 MB |
 | **API Tokens/Month** | ~7.7 Billion (free) |
-| **Supported Providers** | 27+ |
+| **Supported Providers** | 27+ (108+ models) |
 
 ---
 
