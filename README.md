@@ -256,7 +256,7 @@ Luna works **completely free out of the box** using Pollinations. But for better
 | **Frontend** | React 18, Vite, Tailwind CSS, Framer Motion |
 | **Desktop** | Electron 30.5.1, Node.js 20 |
 | **Backend** | Express.js, SQLite3 |
-| **AI** | Groq, Gemini, Cerebras, Mistral, OpenRouter, and 22+ more |
+| **AI** | Groq, Gemini, Cerebras, Mistral, OpenRouter, Provider Omni Route, FreeLLMAPI, and other configured providers |
 | **Voice** | Web Speech API, Edge TTS, Picovoice |
 | **Database** | SQLite3 (local, encrypted) |
 | **Styling** | Tailwind CSS 4, Glassmorphism design |
@@ -271,8 +271,31 @@ Luna works **completely free out of the box** using Pollinations. But for better
 | **Average Response** | 1.2 seconds |
 | **Memory Usage (Idle)** | ~210 MB |
 | **Memory Usage (Peak)** | ~350 MB |
-| **API Tokens/Month** | ~7.7 Billion (free) |
-| **Supported Providers** | 27+ (108+ models) |
+| **API Tokens/Month** | Provider-dependent; aggregate free quota is not verified by Luna |
+| **Supported Providers** | Configured provider integrations; aggregate counts are not independently verified |
+
+---
+
+## 🔌 Provider Omni Route and FreeLLMAPI
+
+Luna AI treats **Provider Omni Route** and **FreeLLMAPI** as separate OpenAI-compatible gateways. They do not share credentials, model catalogs, or quota accounting.
+
+### Provider Omni Route
+
+1. Install and start [OmniRoute](https://github.com/diegosouzapw/OmniRoute) using its official instructions.
+2. Open the local dashboard, normally at `http://localhost:20128`.
+3. In **Providers**, add the upstream provider credentials you want OmniRoute to route to.
+4. In **API Key Setup** or the gateway settings, create or copy the OmniRoute access key if authentication is enabled. Local no-auth mode can leave the key blank.
+5. Set `OMNIROUTE_BASE_URL=http://localhost:20128/v1` and, when needed, `OMNIROUTE_API_KEY=...` in `.env` or use the **Provider Omni Route** card in Luna Settings.
+
+### FreeLLMAPI
+
+1. Install and start [FreeLLMAPI](https://github.com/tashfeenahmed/freellmapi) using its official instructions; its default dashboard is normally `http://localhost:3001`.
+2. Open the **Keys** page and add the upstream provider keys you own, such as Google AI Studio, Groq, Cerebras, or Mistral keys.
+3. Configure the fallback chain, then create/copy the **unified API key** shown on the Keys page. This unified key is the value Luna needs; it is not one of the upstream provider keys.
+4. Set `FREELLMAPI_BASE_URL=http://localhost:3001/v1` and `FREELLMAPI_API_KEY=...` in `.env` or use the **FreeLLMAPI** card in Luna Settings.
+
+The exact models, free-tier limits, and upstream availability are determined by each running gateway and are **UNVERIFIED** until that local instance responds successfully. Never commit `.env` or paste real keys into source code.
 
 ---
 

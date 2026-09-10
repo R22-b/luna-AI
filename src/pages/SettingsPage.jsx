@@ -7,6 +7,8 @@ const PROVIDERS = [
   { key: 'DEEPSEEK_API_KEY', name: 'DeepSeek', desc: 'Elite coding brain', link: 'https://platform.deepseek.com/api_keys', free: true },
   { key: 'CEREBRAS_API_KEY', name: 'Cerebras', desc: '1M tokens/day speed', link: 'https://cloud.cerebras.ai/', free: true },
   { key: 'OPENROUTER_API_KEY', name: 'OpenRouter', desc: 'Multi-model access', link: 'https://openrouter.ai/keys', free: true },
+  { key: 'OMNIROUTE_API_KEY', name: 'Provider Omni Route', desc: 'Independent local OpenAI-compatible gateway', link: 'https://github.com/diegosouzapw/OmniRoute', free: true },
+  { key: 'FREELLMAPI_API_KEY', name: 'FreeLLMAPI', desc: 'Independent unified OpenAI-compatible gateway', link: 'https://github.com/tashfeenahmed/freellmapi', free: true },
   { key: 'COHERE_API_KEY', name: 'Cohere', desc: 'Best summarization', link: 'https://dashboard.cohere.com/api-keys', free: true },
   { key: 'MISTRAL_API_KEY', name: 'Mistral', desc: 'Best for code', link: 'https://console.mistral.ai/api-keys', free: true },
   { key: 'TOGETHER_API_KEY', name: 'Together AI', desc: 'Creative tasks', link: 'https://api.together.xyz/settings/api-keys', free: true },

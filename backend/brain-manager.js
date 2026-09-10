@@ -32,6 +32,21 @@ const PROVIDERS = {
     keyEnv: 'OPENROUTER_API_KEY',
     format: 'openai',
   },
+  omniroute: {
+    name: 'Provider Omni Route',
+    model: 'auto',
+    url: `${process.env.OMNIROUTE_BASE_URL || 'http://localhost:20128/v1'}/chat/completions`,
+    keyEnv: 'OMNIROUTE_API_KEY',
+    optionalKey: true,
+    format: 'openai',
+  },
+  freellmapi: {
+    name: 'FreeLLMAPI',
+    model: 'auto',
+    url: `${process.env.FREELLMAPI_BASE_URL || 'http://localhost:3001/v1'}/chat/completions`,
+    keyEnv: 'FREELLMAPI_API_KEY',
+    format: 'openai',
+  },
   cohere: {
     name: 'Cohere',
     model: 'command-r-plus',
@@ -257,7 +272,7 @@ async function callProvider(providerName, messages, systemPrompt = '', maxTokens
   if (!provider) return { success: false, content: null, latency: 0, error: 'Unknown provider' };
 
   const apiKey = getKey(providerName);
-  if (provider.keyEnv && !apiKey) {
+  if (provider.keyEnv && !apiKey && !provider.optionalKey) {
     return { success: false, content: null, latency: 0, error: 'No API key' };
   }
 
@@ -280,7 +295,7 @@ async function callProvider(providerName, messages, systemPrompt = '', maxTokens
           temperature: 0.7,
         }, {
           headers: {
-            'Authorization': `Bearer ${apiKey}`,
+            ...(apiKey ? { 'Authorization': `Bearer ${apiKey}` } : {}),
             'Content-Type': 'application/json',
           },
           timeout: 30000,
